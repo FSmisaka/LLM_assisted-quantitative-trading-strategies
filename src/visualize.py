@@ -21,6 +21,8 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import pandas as pd
 
+from utils import load_data, save_to_csv
+
 
 # ============================================================================
 # 配置
@@ -47,29 +49,6 @@ PROCESSED_OUTPUT = os.path.join(
 # ============================================================================
 # 主逻辑
 # ============================================================================
-
-def load_data(csv_path: str) -> pd.DataFrame:
-    """读取 CSV 并做基础处理。"""
-    if not os.path.exists(csv_path):
-        print(f"❌ 文件不存在: {csv_path}")
-        print("   请先运行 src/fetch_data.py 获取数据。")
-        sys.exit(1)
-
-    df = pd.read_csv(csv_path, encoding="utf-8-sig")
-
-    # 确保必要列存在
-    required_cols = {"trade_date", "close"}
-    missing = required_cols - set(df.columns)
-    if missing:
-        print(f"❌ CSV 缺少必要列: {missing}")
-        sys.exit(1)
-
-    # 转换日期列
-    df["trade_date"] = pd.to_datetime(df["trade_date"], format="%Y%m%d")
-    df = df.sort_values("trade_date").reset_index(drop=True)
-
-    return df
-
 
 def plot_close_price(df: pd.DataFrame, ts_code: str, output_path: str) -> None:
     """绘制每日收盘价曲线图并保存。"""
@@ -115,13 +94,10 @@ def plot_close_price(df: pd.DataFrame, ts_code: str, output_path: str) -> None:
 
 
 def save_processed_csv(df: pd.DataFrame, output_path: str) -> None:
-    """保存处理后的数据为 CSV。"""
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    # 保留原始日期格式便于后续使用
+    """保存处理后的数据为 CSV（日期还原为 YYYYMMDD 格式）。"""
     df_out = df.copy()
     df_out["trade_date"] = df_out["trade_date"].dt.strftime("%Y%m%d")
-    df_out.to_csv(output_path, index=False, encoding="utf-8-sig")
-    print(f"✅ 处理后数据已保存至: {output_path}")
+    save_to_csv(df_out, output_path)
 
 
 def print_summary(df: pd.DataFrame) -> None:
@@ -139,7 +115,7 @@ def main() -> None:
     # 解析命令行参数
     csv_path = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_CSV
 
-    df = load_data(csv_path)
+    df = load_data(csv_path, required_cols={"trade_date", "close"})
 
     # 从 CSV 中提取股票代码（如果有 ts_code 列），否则从文件名推断
     if "ts_code" in df.columns:
