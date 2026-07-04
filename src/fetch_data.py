@@ -22,6 +22,8 @@ import sys
 import pandas as pd
 import tushare as ts
 
+from utils import get_token, save_to_csv
+
 
 # ============================================================================
 # 配置
@@ -42,17 +44,6 @@ OUTPUT_FILE = os.path.join(OUTPUT_DIR, "688256_daily.csv")
 # ============================================================================
 # 主逻辑
 # ============================================================================
-
-def get_token() -> str:
-    """从环境变量获取 TuShare token。"""
-    token = os.environ.get("TUSHARE_TOKEN", "")
-    if not token:
-        print("❌ 未找到 TUSHARE_TOKEN 环境变量。")
-        print("   请先注册 TuShare Pro（https://tushare.pro），获取 token 后执行：")
-        print("   export TUSHARE_TOKEN=\"your_token_here\"")
-        sys.exit(1)
-    return token
-
 
 def fetch_daily(ts_code: str, start_date: str, end_date: str) -> pd.DataFrame:
     """
@@ -105,13 +96,6 @@ def fetch_daily(ts_code: str, start_date: str, end_date: str) -> pd.DataFrame:
     # 按交易日期升序排列
     df = df.sort_values("trade_date").reset_index(drop=True)
     return df
-
-
-def save_to_csv(df: pd.DataFrame, filepath: str) -> None:
-    """将 DataFrame 保存为 CSV 文件。"""
-    os.makedirs(os.path.dirname(filepath), exist_ok=True)
-    df.to_csv(filepath, index=False, encoding="utf-8-sig")
-    print(f"✅ 数据已保存至: {filepath}")
 
 
 def main() -> None:
