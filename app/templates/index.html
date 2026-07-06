@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quant Dashboard</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <script src="https://cdn.plot.ly/plotly-3.0.0.min.js"></script>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ═══════════════ Sidebar ═══════════════ -->
+  <nav class="sidebar" id="sidebar">
+
+    <!-- Icon strip -->
+    <div class="sb-icons">
+      <button class="sb-icon active" data-panel="data" title="数据源">
+        <span class="sb-icon-symbol">📡</span>
+        <span class="sb-icon-label">数据源</span>
+      </button>
+      <button class="sb-icon" data-panel="indicator" title="指标">
+        <span class="sb-icon-symbol">⚙️</span>
+        <span class="sb-icon-label">指标</span>
+      </button>
+      <button class="sb-icon" data-panel="signal" title="交易信号">
+        <span class="sb-icon-symbol">📊</span>
+        <span class="sb-icon-label">信号</span>
+      </button>
+    </div>
+
+    <!-- Panel: Data Source ═══════════════════ -->
+    <div class="sb-panel" id="panel-data">
+      <h3 class="panel-heading">📡 数据源</h3>
+
+      <div class="field">
+        <label>本地文件</label>
+        <div class="field-with-btn">
+          <select id="data-file"></select>
+          <button id="btn-refresh-files" class="icon-btn" title="刷新列表">🔄</button>
+        </div>
+      </div>
+
+      <div class="sep"><span>或获取新数据</span></div>
+
+      <div class="field">
+        <label>股票代码</label>
+        <input type="text" id="ts-code" value="688256.SH" placeholder="如 688256.SH">
+      </div>
+      <div class="code-chips">
+        <span onclick="setCode('688256.SH')">寒武纪</span>
+        <span onclick="setCode('600519.SH')">贵州茅台</span>
+        <span onclick="setCode('000001.SZ')">平安银行</span>
+        <span onclick="setCode('688111.SH')">金山办公</span>
+      </div>
+
+      <div class="field-row">
+        <div class="field"><label>起始</label><input type="text" id="start-date" value="20250701"></div>
+        <div class="field"><label>结束</label><input type="text" id="end-date" value="20260701"></div>
+      </div>
+
+      <button id="btn-fetch" class="btn primary full">🚀 获取数据</button>
+      <div id="fetch-status"></div>
+    </div>
+
+    <!-- Panel: Indicator ═══════════════════ -->
+    <div class="sb-panel" id="panel-indicator">
+      <h3 class="panel-heading">⚙️ 技术指标</h3>
+
+      <!-- Indicator selector cards -->
+      <div class="indicator-cards" id="indicator-cards">
+        <button class="ind-card active" data-ind="price_ma">
+          <span class="ind-icon">📈</span>
+          <span class="ind-name">Price + MA</span>
+          <span class="ind-desc">收盘价与移动平均线</span>
+        </button>
+        <button class="ind-card" data-ind="rsi">
+          <span class="ind-icon">📊</span>
+          <span class="ind-name">RSI</span>
+          <span class="ind-desc">相对强弱指数</span>
+        </button>
+        <button class="ind-card" data-ind="macd">
+          <span class="ind-icon">📉</span>
+          <span class="ind-name">MACD</span>
+          <span class="ind-desc">指数平滑异同移动平均线</span>
+        </button>
+        <button class="ind-card" data-ind="bb">
+          <span class="ind-icon">🎯</span>
+          <span class="ind-name">布林带</span>
+          <span class="ind-desc">Bollinger Bands</span>
+        </button>
+      </div>
+
+      <!-- Dynamic parameter area -->
+      <div class="ind-params" id="ind-params">
+        <!-- Populated by JS based on selected indicator -->
+      </div>
+
+      <button id="btn-apply" class="btn accent full">✨ 刷新图表</button>
+      <div id="compute-status"></div>
+    </div>
+
+    <!-- Panel: Signal ═══════════════════ -->
+    <div class="sb-panel" id="panel-signal">
+      <h3 class="panel-heading">📊 最新交易日信号</h3>
+      <div id="signal-content">
+        <p class="muted">请先选择数据并计算指标</p>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ═══════════════ Chart ═══════════════ -->
+  <main class="main" id="main">
+    <div id="chart-empty" class="chart-empty">
+      <div class="empty-icon">📈</div>
+      <h2>Quant Dashboard</h2>
+      <p>选择数据源 → 选择指标 → 查看图表</p>
+    </div>
+    <div id="chart-container"></div>
+  </main>
+
+</div>
+
+<script src="/static/js/dashboard.js"></script>
+</body>
+</html>
