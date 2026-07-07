@@ -36,7 +36,7 @@ from utils import load_data
 plt.rcParams["font.sans-serif"] = ["Arial Unicode MS", "SimHei", "Heiti TC", "sans-serif"]
 plt.rcParams["axes.unicode_minus"] = False
 
-DEFAULT_CSV = os.path.join(os.path.dirname(__file__), "..", "data", "raw", "688256_daily.csv")
+DEFAULT_CSV = os.path.join(os.path.dirname(__file__), "..", "data", "raw", "688256_daily_qfq.csv")
 
 # ── 指标参数（集中管理，便于调参）────────────────────────────────────────────
 RSI_PERIOD = 14

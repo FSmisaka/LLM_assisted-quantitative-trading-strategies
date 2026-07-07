@@ -162,7 +162,7 @@ def compute_indicators():
 
     请求体：
     {
-        "file": "688256_daily.csv",      // data/raw/ 下的文件名
+        "file": "688256_daily_qfq.csv",      // data/raw/ 下的文件名
         "rsi_period": 14,
         "macd_fast": 12, "macd_slow": 26, "macd_signal": 9,
         "bb_period": 20, "bb_std": 2.0,
@@ -170,7 +170,7 @@ def compute_indicators():
     }
     """
     data = request.get_json()
-    filename = data.get("file", "688256_daily.csv")
+    filename = data.get("file", "688256_daily_qfq.csv")
     filepath = os.path.join(DATA_RAW, filename)
 
     if not os.path.exists(filepath):
