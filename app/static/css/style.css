@@ -326,6 +326,170 @@ body {
 
 .muted { color: rgba(255,255,255,.3); font-size: .78rem; }
 
+/* ═══════════════ Backtest Container ═══════════ */
+
+#backtest-container {
+  display: none;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background: var(--bg);
+  padding: 16px 20px;
+  gap: 14px;
+  overflow-y: auto;
+}
+
+/* ── KPI Card Row ──────────────────────────── */
+
+.bt-kpi-row {
+  display: flex;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.bt-kpi-card {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 95px;
+  transition: box-shadow var(--trans);
+}
+.bt-kpi-card:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,.06);
+}
+
+.bt-kpi-value {
+  font-size: 1.65rem;
+  font-weight: 700;
+  font-family: var(--mono);
+  line-height: 1.2;
+  color: var(--text);
+}
+
+.bt-kpi-label {
+  font-size: .72rem;
+  font-weight: 600;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  margin-top: 2px;
+}
+
+.bt-kpi-sub {
+  font-size: .65rem;
+  color: var(--text3);
+  margin-top: 5px;
+  text-align: center;
+  min-height: 1em;
+}
+
+/* KPI color states */
+.bt-kpi-card.positive .bt-kpi-value { color: var(--success); }
+.bt-kpi-card.negative .bt-kpi-value { color: var(--danger); }
+.bt-kpi-card.warning .bt-kpi-value { color: var(--warning); }
+.bt-kpi-card.neutral  .bt-kpi-value { color: var(--text2); }
+
+/* ── Backtest Charts ───────────────────────── */
+
+.bt-chart {
+  min-height: 0;
+  background: var(--bg);
+  border-radius: var(--radius);
+}
+
+.bt-chart-ma {
+  flex: 2.2;
+}
+
+.bt-chart-row {
+  display: flex;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+}
+
+.bt-chart-half {
+  flex: 1;
+  min-height: 0;
+}
+
+/* ── Toggle Switch (commission) ────────────── */
+
+.field-inline {
+  margin-bottom: 6px;
+}
+
+.toggle-label {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  color: rgba(255,255,255,.65) !important;
+  font-size: .75rem !important;
+  text-transform: none !important;
+  letter-spacing: normal !important;
+  margin-bottom: 0 !important;
+}
+
+.toggle-label input[type="checkbox"] {
+  display: none;
+}
+
+.toggle-track {
+  width: 36px;
+  height: 20px;
+  border-radius: 10px;
+  background: rgba(255,255,255,.15);
+  position: relative;
+  transition: background var(--trans);
+  flex-shrink: 0;
+}
+
+.toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform var(--trans);
+  box-shadow: 0 1px 3px rgba(0,0,0,.2);
+}
+
+.toggle-label input:checked + .toggle-track {
+  background: var(--accent);
+}
+
+.toggle-label input:checked + .toggle-track .toggle-thumb {
+  transform: translateX(16px);
+}
+
+/* ── Backtest Buttons ──────────────────────── */
+
+.bt-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.btn-outline {
+  border: 1px solid rgba(255,255,255,.15) !important;
+  background: rgba(255,255,255,.04) !important;
+  color: rgba(255,255,255,.7) !important;
+}
+.btn-outline:hover {
+  background: rgba(255,255,255,.08) !important;
+  border-color: rgba(255,255,255,.25) !important;
+}
+
 /* ═══════════════ Responsive ═══════════════ */
 
 @media (max-width: 768px) {

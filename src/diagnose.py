@@ -6,7 +6,7 @@ diagnose.py
 用法：
     python src/diagnose.py [csv_path]
 
-    - 不传参数：默认读取 data/raw/688256_daily_qfq.csv
+    - 不传参数：默认读取 data/raw/688256_SH_20210701_20260701.csv
 """
 
 import os
@@ -23,7 +23,7 @@ from utils import load_data, divider
 # 配置
 # ============================================================================
 
-DEFAULT_CSV = os.path.join(os.path.dirname(__file__), "..", "data", "raw", "688256_daily_qfq.csv")
+DEFAULT_CSV = os.path.join(os.path.dirname(__file__), "..", "data", "raw", "688256_SH_20210701_20260701.csv")
 
 # 数值列分组
 PRICE_COLS = ["open", "high", "low", "close", "pre_close"]

@@ -28,6 +28,10 @@
         <span class="sb-icon-symbol">📊</span>
         <span class="sb-icon-label">信号</span>
       </button>
+      <button class="sb-icon" data-panel="backtest" title="回测">
+        <span class="sb-icon-symbol">🧪</span>
+        <span class="sb-icon-label">回测</span>
+      </button>
     </div>
 
     <!-- Panel: Data Source ═══════════════════ -->
@@ -108,6 +112,45 @@
         <p class="muted">请先选择数据并计算指标</p>
       </div>
     </div>
+
+    <!-- Panel: Backtest ═══════════════════ -->
+    <div class="sb-panel" id="panel-backtest">
+      <h3 class="panel-heading">🧪 双均线回测</h3>
+
+      <div class="field">
+        <label>数据文件</label>
+        <select id="bt-file"></select>
+      </div>
+
+      <div class="field-row">
+        <div class="field"><label>回测起始</label><input type="text" id="bt-start-date" placeholder="YYYYMMDD"></div>
+        <div class="field"><label>回测结束</label><input type="text" id="bt-end-date" placeholder="YYYYMMDD"></div>
+      </div>
+
+      <div class="field-row">
+        <div class="field"><label>短周期 SMA</label><input type="number" id="bt-short-sma" value="5" min="2" max="250"></div>
+        <div class="field"><label>长周期 SMA</label><input type="number" id="bt-long-sma" value="20" min="3" max="500"></div>
+      </div>
+
+      <div class="field">
+        <label>初始资金 (CNY)</label>
+        <input type="number" id="bt-capital" value="100000" min="1000" step="1000">
+      </div>
+
+      <div class="field field-inline">
+        <label class="toggle-label">
+          <input type="checkbox" id="bt-commission">
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          启用手续费（万分之三）
+        </label>
+      </div>
+
+      <div class="bt-actions">
+        <button id="btn-bt-reset" class="btn full btn-outline">🔄 重置默认参数</button>
+        <button id="btn-bt-run" class="btn accent full">▶ 运行回测</button>
+      </div>
+      <div id="bt-status" class="status-msg"></div>
+    </div>
   </nav>
 
   <!-- ═══════════════ Chart ═══════════════ -->
@@ -118,6 +161,40 @@
       <p>选择数据源 → 选择指标 → 查看图表</p>
     </div>
     <div id="chart-container"></div>
+
+    <!-- ════════ Backtest Results ════════ -->
+    <div id="backtest-container">
+      <!-- KPI cards -->
+      <div class="bt-kpi-row" id="bt-kpi-row">
+        <div class="bt-kpi-card" id="kpi-annual">
+          <span class="bt-kpi-value">--</span>
+          <span class="bt-kpi-label">年化收益率</span>
+          <span class="bt-kpi-sub"></span>
+        </div>
+        <div class="bt-kpi-card" id="kpi-sharpe">
+          <span class="bt-kpi-value">--</span>
+          <span class="bt-kpi-label">夏普比率</span>
+          <span class="bt-kpi-sub"></span>
+        </div>
+        <div class="bt-kpi-card" id="kpi-drawdown">
+          <span class="bt-kpi-value">--</span>
+          <span class="bt-kpi-label">最大回撤</span>
+          <span class="bt-kpi-sub"></span>
+        </div>
+        <div class="bt-kpi-card" id="kpi-winrate">
+          <span class="bt-kpi-value">--</span>
+          <span class="bt-kpi-label">胜率</span>
+          <span class="bt-kpi-sub"></span>
+        </div>
+      </div>
+      <!-- Dual MA signal chart -->
+      <div id="bt-chart-ma" class="bt-chart bt-chart-ma"></div>
+      <!-- Bottom row: drawdown + comparison -->
+      <div class="bt-chart-row">
+        <div id="bt-chart-dd" class="bt-chart bt-chart-half"></div>
+        <div id="bt-chart-cmp" class="bt-chart bt-chart-half"></div>
+      </div>
+    </div>
   </main>
 
 </div>

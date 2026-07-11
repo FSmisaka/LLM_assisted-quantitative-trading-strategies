@@ -6,7 +6,7 @@ visualize.py
 用法：
     python src/visualize.py [csv_path]
 
-    - 不传参数：默认读取 data/raw/688256_daily_qfq.csv
+    - 不传参数：默认读取 data/raw/688256_SH_20210701_20260701.csv
     - 传入路径：读取指定 CSV 文件
 
 输出：
@@ -34,7 +34,7 @@ plt.rcParams["axes.unicode_minus"] = False  # 解决负号显示问题
 
 # 默认输入路径
 DEFAULT_CSV = os.path.join(
-    os.path.dirname(__file__), "..", "data", "raw", "688256_daily_qfq.csv"
+    os.path.dirname(__file__), "..", "data", "raw", "688256_SH_20210701_20260701.csv"
 )
 
 # 输出路径

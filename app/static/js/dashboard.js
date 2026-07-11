@@ -28,12 +28,27 @@ const elChartEmpty = $('#chart-empty');
 const elChartContainer = $('#chart-container');
 const elSignalContent = $('#signal-content');
 
+// Backtest elements
+const elBtFile = $('#bt-file');
+const elBtStart = $('#bt-start-date');
+const elBtEnd = $('#bt-end-date');
+const elBtShort = $('#bt-short-sma');
+const elBtLong = $('#bt-long-sma');
+const elBtCapital = $('#bt-capital');
+const elBtCommission = $('#bt-commission');
+const elBtRun = $('#btn-bt-run');
+const elBtReset = $('#btn-bt-reset');
+const elBtStatus = $('#bt-status');
+const elBacktestContainer = $('#backtest-container');
+
 // ═══════════════════════════ State ═══════════════════════════
 
 let activePanel = 'data';
 let activeInd = 'price_ma';
 let indicatorData = null;
 let lastParams = null;
+let backtestData = null;
+let fileListCache = [];  // cached file list for backtest date validation
 
 // ═══════════════════════════ Chart Config ═══════════════════
 
@@ -151,7 +166,40 @@ function openPanel(name) {
     icons.forEach(ic => ic.classList.toggle('active', ic.dataset.panel === name));
     panels.forEach(p => p.classList.toggle('visible', p.id === `panel-${name}`));
   }
-  requestAnimationFrame(() => { if (indicatorData) renderActiveChart(); });
+
+  // View switching
+  if (activePanel === 'backtest') {
+    elChartContainer.style.display = 'none';
+    elChartEmpty.style.display = 'none';
+    elBacktestContainer.style.display = backtestData ? 'flex' : 'none';
+    if (!backtestData) {
+      elChartEmpty.style.display = 'flex';
+      elChartEmpty.querySelector('h2').textContent = '双均线回测';
+      elChartEmpty.querySelector('p').textContent = '设置参数 → 运行回测 → 查看结果';
+    }
+    if (backtestData) renderBacktest();
+  } else if (activePanel && indicatorData) {
+    elBacktestContainer.style.display = 'none';
+    elChartEmpty.style.display = 'none';
+    elChartContainer.style.display = 'block';
+    requestAnimationFrame(() => renderActiveChart());
+  } else if (activePanel && !indicatorData) {
+    elBacktestContainer.style.display = 'none';
+    elChartContainer.style.display = 'none';
+    elChartEmpty.style.display = 'flex';
+    elChartEmpty.querySelector('h2').textContent = 'Quant Dashboard';
+    elChartEmpty.querySelector('p').textContent = '选择数据源 → 选择指标 → 查看图表';
+  } else {
+    // Collapsed
+    elBacktestContainer.style.display = 'none';
+    if (indicatorData) {
+      elChartEmpty.style.display = 'none';
+      elChartContainer.style.display = 'block';
+    } else {
+      elChartContainer.style.display = 'none';
+      elChartEmpty.style.display = 'flex';
+    }
+  }
 }
 
 icons.forEach(icon => icon.addEventListener('click', () => openPanel(icon.dataset.panel)));
@@ -227,10 +275,14 @@ async function loadFiles() {
   try {
     const resp = await fetch('/api/files');
     const files = await resp.json();
-    elFile.innerHTML = files.map(f =>
+    fileListCache = files;
+    const opts = files.map(f =>
       `<option value="${f.name}">${f.name} ${f.ts_code?'('+f.ts_code+')':''} — ${f.rows||'?'}行</option>`
     ).join('');
+    elFile.innerHTML = opts;
+    elBtFile.innerHTML = opts;
     if (files.length) elFetchStatus.textContent = `共 ${files.length} 个文件可用`;
+    updateBtDatePlaceholders();
   } catch(e) { elFetchStatus.textContent = '加载文件列表失败'; }
 }
 
@@ -393,6 +445,287 @@ function renderSignal(sig, params) {
 }
 
 
+// ═══════════════════════════ Backtest ═════════════════════
+
+function getBtFileMeta() {
+  const name = elBtFile.value;
+  return fileListCache.find(f => f.name === name) || null;
+}
+
+function updateBtDatePlaceholders() {
+  const meta = getBtFileMeta();
+  if (meta && meta.date_min && meta.date_max) {
+    elBtStart.placeholder = meta.date_min;
+    elBtEnd.placeholder = meta.date_max;
+  }
+}
+
+function onBtFileChange() {
+  updateBtDatePlaceholders();
+}
+
+function resetBtParams() {
+  elBtShort.value = 5;
+  elBtLong.value = 20;
+  elBtCapital.value = 100000;
+  elBtCommission.checked = false;
+  elBtStart.value = '';
+  elBtEnd.value = '';
+  updateBtDatePlaceholders();
+  elBtStatus.textContent = '';
+}
+
+async function runBacktest() {
+  const file = elBtFile.value;
+  if (!file) { elBtStatus.textContent = '❌ 请选择数据文件'; return; }
+
+  const shortSma = parseInt(elBtShort.value);
+  const longSma = parseInt(elBtLong.value);
+  if (shortSma >= longSma) {
+    elBtStatus.textContent = '❌ 短周期必须小于长周期';
+    return;
+  }
+  if (shortSma < 2) { elBtStatus.textContent = '❌ 短周期 SMA 最小为 2'; return; }
+
+  const capital = parseFloat(elBtCapital.value);
+  if (capital <= 0) { elBtStatus.textContent = '❌ 初始资金必须大于 0'; return; }
+
+  const startDate = elBtStart.value.trim() || null;
+  const endDate = elBtEnd.value.trim() || null;
+
+  const params = {
+    file,
+    short_sma: shortSma,
+    long_sma: longSma,
+    commission_enabled: elBtCommission.checked,
+    initial_capital: capital,
+    start_date: startDate,
+    end_date: endDate,
+  };
+
+  elBtRun.disabled = true;
+  elBtStatus.textContent = '⏳ 回测计算中…';
+  try {
+    const resp = await fetch('/api/backtest', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    const r = await resp.json();
+    if (r.ok) {
+      backtestData = r;
+      renderBacktest();
+      elBtStatus.textContent = `✅ 回测完成 — ${r.data.dates.length} 个交易日`;
+    } else {
+      elBtStatus.textContent = `❌ ${r.error}`;
+    }
+  } catch (e) {
+    elBtStatus.textContent = `❌ ${e.message}`;
+  } finally {
+    elBtRun.disabled = false;
+  }
+}
+
+function renderBacktest() {
+  if (!backtestData) return;
+  const d = backtestData.data;
+  const m = backtestData.metrics;
+
+  // Show backtest container
+  elChartEmpty.style.display = 'none';
+  elChartContainer.style.display = 'none';
+  elBacktestContainer.style.display = 'flex';
+  _hoverWired = false;
+
+  // ── KPI Cards ──────────────────────────────────────────
+  renderBacktestKPIs(m);
+
+  // ── Middle: Dual MA + Signals Chart ────────────────────
+  renderMAChart(d, backtestData.params);
+
+  // ── Bottom-Left: Drawdown Chart ────────────────────────
+  renderDrawdownChart(d);
+
+  // ── Bottom-Right: Strategy vs Benchmark ────────────────
+  renderComparisonChart(d, m);
+}
+
+function renderBacktestKPIs(m) {
+  // 年化收益率
+  const ann = m.annual_return;
+  let annCls = 'neutral', annText = 'N/A';
+  if (ann !== null && ann !== undefined) {
+    annText = (ann >= 0 ? '+' : '') + ann.toFixed(2) + '%';
+    annCls = ann > 0 ? 'positive' : (ann < 0 ? 'negative' : 'neutral');
+  }
+  $('#kpi-annual').className = 'bt-kpi-card ' + annCls;
+  $('#kpi-annual').innerHTML = `
+    <span class="bt-kpi-value">${annText}</span>
+    <span class="bt-kpi-label">年化收益率</span>
+    <span class="bt-kpi-sub">总收益: ${m.total_return >= 0 ? '+' : ''}${m.total_return.toFixed(2)}%</span>`;
+
+  // 夏普比率
+  const sh = m.sharpe_ratio;
+  let shCls = 'neutral', shText = 'N/A';
+  if (sh !== null && sh !== undefined) {
+    shText = sh.toFixed(2);
+    shCls = sh >= 2 ? 'positive' : (sh >= 1 ? 'warning' : (sh < 0 ? 'negative' : 'neutral'));
+  }
+  $('#kpi-sharpe').className = 'bt-kpi-card ' + shCls;
+  $('#kpi-sharpe').innerHTML = `
+    <span class="bt-kpi-value">${shText}</span>
+    <span class="bt-kpi-label">夏普比率</span>
+    <span class="bt-kpi-sub">基准收益: ${m.benchmark_return >= 0 ? '+' : ''}${m.benchmark_return.toFixed(2)}%</span>`;
+
+  // 最大回撤
+  const mdd = m.max_drawdown;
+  let mddCls = 'neutral', mddText = 'N/A';
+  if (mdd !== null && mdd !== undefined) {
+    mddText = mdd.toFixed(2) + '%';
+    mddCls = mdd > -10 ? 'positive' : (mdd > -20 ? 'warning' : 'negative');
+  }
+  $('#kpi-drawdown').className = 'bt-kpi-card ' + mddCls;
+  $('#kpi-drawdown').innerHTML = `
+    <span class="bt-kpi-value">${mddText}</span>
+    <span class="bt-kpi-label">最大回撤</span>
+    <span class="bt-kpi-sub">${m.max_drawdown_date || ''}</span>`;
+
+  // 胜率
+  const wr = m.win_rate;
+  let wrCls = 'neutral', wrText = 'N/A';
+  if (wr !== null && wr !== undefined) {
+    wrText = wr.toFixed(1) + '%';
+    wrCls = wr >= 60 ? 'positive' : (wr >= 40 ? 'warning' : (wr < 30 ? 'negative' : 'neutral'));
+  }
+  const plText = m.profit_loss_ratio !== null && m.profit_loss_ratio !== undefined
+    ? '盈亏比 ' + m.profit_loss_ratio.toFixed(2) : '';
+  $('#kpi-winrate').className = 'bt-kpi-card ' + wrCls;
+  $('#kpi-winrate').innerHTML = `
+    <span class="bt-kpi-value">${wrText}</span>
+    <span class="bt-kpi-label">胜率</span>
+    <span class="bt-kpi-sub">${m.trade_count}笔交易${plText ? ' | ' + plText : ''}</span>`;
+}
+
+function renderMAChart(d, params) {
+  const traces = [
+    {
+      x: d.dates, y: d.close, type: 'scatter', mode: 'lines',
+      line: { color: '#64748b', width: 1.2 },
+      name: 'Close', hovertemplate: '收盘: %{y:.2f}<extra></extra>',
+    },
+    {
+      x: d.dates, y: d.short_ma, type: 'scatter', mode: 'lines',
+      line: { color: '#f59e0b', width: 1.0 },
+      name: `SMA(${params.short_sma})`, hovertemplate: '短均: %{y:.2f}<extra></extra>',
+    },
+    {
+      x: d.dates, y: d.long_ma, type: 'scatter', mode: 'lines',
+      line: { color: '#3b82f6', width: 1.0 },
+      name: `SMA(${params.long_sma})`, hovertemplate: '长均: %{y:.2f}<extra></extra>',
+    },
+  ];
+
+  // Buy markers — red upward triangles
+  if (d.buy_signals && d.buy_signals.length > 0) {
+    traces.push({
+      x: d.buy_signals.map(s => s.date), y: d.buy_signals.map(s => s.price),
+      type: 'scatter', mode: 'markers',
+      marker: { symbol: 'triangle-up', color: '#ef4444', size: 12, line: { width: 0 } },
+      name: '买入 (金叉)',
+      hovertemplate: '<b>买入</b><br>日期: %{x}<br>价格: ¥%{y:.2f}<extra></extra>',
+    });
+  }
+
+  // Sell markers — green downward triangles
+  if (d.sell_signals && d.sell_signals.length > 0) {
+    traces.push({
+      x: d.sell_signals.map(s => s.date), y: d.sell_signals.map(s => s.price),
+      type: 'scatter', mode: 'markers',
+      marker: { symbol: 'triangle-down', color: '#10b981', size: 12, line: { width: 0 } },
+      name: '卖出 (死叉)',
+      hovertemplate: '<b>卖出</b><br>日期: %{x}<br>价格: ¥%{y:.2f}<extra></extra>',
+    });
+  }
+
+  const layout = {
+    ...chartLayout('价格 (CNY)'),
+    title: { text: '双均线交叉信号', font: { size: 13, color: '#374151' }, x: 0.01, y: 0.98 },
+    margin: { l: 60, r: 24, t: 36, b: 40 },
+  };
+
+  Plotly.react('bt-chart-ma', traces, layout, PLOTLY_CONFIG);
+}
+
+function renderDrawdownChart(d) {
+  const dd = d.drawdown;
+  const traces = [
+    {
+      x: d.dates, y: dd, type: 'scatter', mode: 'none',
+      fill: 'tozeroy', fillcolor: 'rgba(239,68,68,0.12)',
+      name: '回撤', hoverinfo: 'skip', showlegend: false,
+    },
+    {
+      x: d.dates, y: dd, type: 'scatter', mode: 'lines',
+      line: { color: '#ef4444', width: 1.1 },
+      name: '回撤 %', hovertemplate: '回撤: %{y:.2f}%<extra></extra>',
+    },
+    {
+      x: [d.dates[0], d.dates[d.dates.length - 1]], y: [0, 0],
+      type: 'scatter', mode: 'lines',
+      line: { color: 'rgba(0,0,0,0.08)', width: 0.5 },
+      name: '0%', hoverinfo: 'skip', showlegend: false,
+    },
+  ];
+
+  const layout = {
+    ...chartLayout('回撤 (%)'),
+    title: { text: '回撤曲线', font: { size: 12, color: '#374151' }, x: 0.01, y: 0.98 },
+    margin: { l: 55, r: 18, t: 36, b: 40 },
+    yaxis: {
+      ...chartLayout().yaxis,
+      title: { text: '回撤 (%)', font: { size: 10, color: '#6b7280' }, standoff: 6 },
+    },
+  };
+
+  Plotly.react('bt-chart-dd', traces, layout, PLOTLY_CONFIG);
+}
+
+function renderComparisonChart(d, m) {
+  const traces = [
+    {
+      x: d.dates, y: d.portfolio_value, type: 'scatter', mode: 'lines',
+      line: { color: '#dc2626', width: 1.6 },
+      name: '双均线策略',
+      hovertemplate: '策略: ¥%{y:,.2f}<extra></extra>',
+    },
+    {
+      x: d.dates, y: d.benchmark_value, type: 'scatter', mode: 'lines',
+      line: { color: '#9ca3af', width: 1.0, dash: 'dash' },
+      name: '买入持有 (基准)',
+      hovertemplate: '基准: ¥%{y:,.2f}<extra></extra>',
+    },
+    {
+      x: [d.dates[0], d.dates[d.dates.length - 1]],
+      y: [m.initial_capital, m.initial_capital],
+      type: 'scatter', mode: 'lines',
+      line: { color: 'rgba(0,0,0,0.06)', width: 0.5 },
+      name: '初始资金', hoverinfo: 'skip', showlegend: false,
+    },
+  ];
+
+  const layout = {
+    ...chartLayout('组合净值 (CNY)'),
+    title: { text: '策略 vs 基准', font: { size: 12, color: '#374151' }, x: 0.01, y: 0.98 },
+    margin: { l: 65, r: 18, t: 36, b: 40 },
+    yaxis: {
+      ...chartLayout().yaxis,
+      title: { text: '净值 (CNY)', font: { size: 10, color: '#6b7280' }, standoff: 8 },
+    },
+  };
+
+  Plotly.react('bt-chart-cmp', traces, layout, PLOTLY_CONFIG);
+}
+
+
 // ═══════════════════════════ Events ═══════════════════════
 
 window.setCode = code => { elTsCode.value = code; };
@@ -404,10 +737,24 @@ elFile.addEventListener('change', computeAndRender);
   el.addEventListener('keydown', e => { if (e.key === 'Enter') fetchData(); });
 });
 
+// Backtest events
+elBtRun.addEventListener('click', runBacktest);
+elBtReset.addEventListener('click', resetBtParams);
+elBtFile.addEventListener('change', onBtFileChange);
+[elBtStart, elBtEnd].forEach(el => {
+  el.addEventListener('keydown', e => { if (e.key === 'Enter') runBacktest(); });
+});
+
 let resizeTimer;
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);
-  resizeTimer = setTimeout(() => { if (indicatorData) renderActiveChart(); }, 250);
+  resizeTimer = setTimeout(() => {
+    if (activePanel === 'backtest' && backtestData) {
+      renderBacktest();
+    } else if (indicatorData) {
+      renderActiveChart();
+    }
+  }, 250);
 });
 
 // ═══════════════════════════ Init ════════════════════════
@@ -417,4 +764,5 @@ window.addEventListener('resize', () => {
   selectIndicator('price_ma');
   openPanel('data');
   if (elFile.value) await computeAndRender();
+  onBtFileChange();
 })();

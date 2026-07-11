@@ -15,7 +15,7 @@ fetch_data.py
     - 股票：688256.SH（寒武纪，AI 芯片龙头，科创板）
     - 时间：过去一年（2025-07-01 至 2026-07-01）
     - 输出 1：data/raw/688256_daily.csv      — 未复权日线数据（daily 接口）
-    - 输出 2：data/raw/688256_daily_qfq.csv  — 前复权日线数据（pro_bar 接口，adj='qfq'）
+    - 输出 2：data/raw/688256_SH_20210701_20260701.csv  — 前复权日线数据（pro_bar 接口，adj='qfq'）
 """
 
 import os
@@ -41,7 +41,7 @@ END_DATE = "20260701"          # 结束日期 YYYYMMDD
 # 输出路径
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "raw")
 OUTPUT_FILE = os.path.join(OUTPUT_DIR, "688256_daily.csv")          # 未复权
-OUTPUT_FILE_ADJ = os.path.join(OUTPUT_DIR, "688256_daily_qfq.csv")  # 前复权
+OUTPUT_FILE_ADJ = os.path.join(OUTPUT_DIR, "688256_SH_20210701_20260701.csv")  # 前复权
 
 
 # ============================================================================

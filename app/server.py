@@ -26,6 +26,7 @@ import pandas as pd
 from flask import Flask, jsonify, render_template, request
 
 from utils import load_data  # noqa: E402
+from backtest import run_backtest  # noqa: E402
 
 # ── Flask 初始化 ────────────────────────────────────────────────────────────
 
@@ -162,7 +163,7 @@ def compute_indicators():
 
     请求体：
     {
-        "file": "688256_daily_qfq.csv",      // data/raw/ 下的文件名
+        "file": "688256_SH_20210701_20260701.csv",      // data/raw/ 下的文件名
         "rsi_period": 14,
         "macd_fast": 12, "macd_slow": 26, "macd_signal": 9,
         "bb_period": 20, "bb_std": 2.0,
@@ -170,7 +171,7 @@ def compute_indicators():
     }
     """
     data = request.get_json()
-    filename = data.get("file", "688256_daily_qfq.csv")
+    filename = data.get("file", "688256_SH_20210701_20260701.csv")
     filepath = os.path.join(DATA_RAW, filename)
 
     if not os.path.exists(filepath):
@@ -248,6 +249,129 @@ def compute_indicators():
             "bb_label": "突破上轨" if bb_pos > 100 else ("跌破下轨" if bb_pos < 0 else "通道内"),
         },
         "n_records": n,
+    })
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# API — 双均线回测
+# ═══════════════════════════════════════════════════════════════════════════
+
+@app.route("/api/backtest", methods=["POST"])
+def backtest():
+    """
+    运行双均线策略回测，返回信号、净值曲线、回撤及绩效指标。
+
+    请求体：
+    {
+        "file": "688256_SH_20210701_20260701.csv",
+        "start_date": "2025-01-01",          // 可选，YYYYMMDD 或 YYYY-MM-DD
+        "end_date": "2026-07-01",            // 可选
+        "short_sma": 5,
+        "long_sma": 20,
+        "commission_enabled": false,
+        "initial_capital": 100000
+    }
+    """
+    data = request.get_json()
+    filename = data.get("file", "")
+    start_date = data.get("start_date") or None
+    end_date = data.get("end_date") or None
+    short_sma = int(data.get("short_sma", 5))
+    long_sma = int(data.get("long_sma", 20))
+    commission_enabled = data.get("commission_enabled", False)
+    initial_capital = float(data.get("initial_capital", 100000))
+
+    # ── 参数校验 ──────────────────────────────────────────────────────────
+    if not filename:
+        return jsonify({"ok": False, "error": "请选择数据文件"}), 400
+
+    filepath = os.path.join(DATA_RAW, filename)
+    if not os.path.exists(filepath):
+        return jsonify({"ok": False, "error": f"文件不存在: {filename}"}), 404
+
+    if short_sma >= long_sma:
+        return jsonify({"ok": False, "error": "短周期 SMA 必须小于长周期 SMA"}), 400
+
+    if short_sma < 2:
+        return jsonify({"ok": False, "error": "短周期 SMA 最小为 2"}), 400
+
+    if initial_capital <= 0:
+        return jsonify({"ok": False, "error": "初始资金必须大于 0"}), 400
+
+    # ── 加载数据 ──────────────────────────────────────────────────────────
+    try:
+        df = load_data(filepath)
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"读取文件失败: {e}"}), 500
+
+    # 获取文件原始日期范围（用于前端校验提示）
+    raw_dates = df["trade_date"]
+    if not pd.api.types.is_datetime64_any_dtype(raw_dates):
+        raw_dates = pd.to_datetime(raw_dates.astype(str), format="%Y%m%d")
+    file_date_min = raw_dates.min().strftime("%Y-%m-%d")
+    file_date_max = raw_dates.max().strftime("%Y-%m-%d")
+
+    # ── 验证日期范围 ──────────────────────────────────────────────────────
+    if start_date:
+        start_dt = pd.to_datetime(start_date)
+        if start_dt < raw_dates.min():
+            return jsonify({
+                "ok": False,
+                "error": f"起始日期 {start_date} 早于文件最早日期 {file_date_min}"
+            }), 400
+        if start_dt > raw_dates.max():
+            return jsonify({
+                "ok": False,
+                "error": f"起始日期 {start_date} 晚于文件最晚日期 {file_date_max}"
+            }), 400
+    if end_date:
+        end_dt = pd.to_datetime(end_date)
+        if end_dt < raw_dates.min():
+            return jsonify({
+                "ok": False,
+                "error": f"结束日期 {end_date} 早于文件最早日期 {file_date_min}"
+            }), 400
+        if end_dt > raw_dates.max():
+            return jsonify({
+                "ok": False,
+                "error": f"结束日期 {end_date} 晚于文件最晚日期 {file_date_max}"
+            }), 400
+
+    if start_date and end_date:
+        if pd.to_datetime(start_date) >= pd.to_datetime(end_date):
+            return jsonify({"ok": False, "error": "起始日期必须早于结束日期"}), 400
+
+    # ── 运行回测 ──────────────────────────────────────────────────────────
+    commission_rate = 0.0003 if commission_enabled else 0.0
+
+    try:
+        result = run_backtest(
+            df=df,
+            short_period=short_sma,
+            long_period=long_sma,
+            initial_capital=initial_capital,
+            commission_rate=commission_rate,
+            start_date=start_date,
+            end_date=end_date,
+        )
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"回测失败: {e}"}), 500
+
+    # ── 组装响应 ──────────────────────────────────────────────────────────
+    return jsonify({
+        "ok": True,
+        "data": result["data"],
+        "metrics": result["metrics"],
+        "file_date_min": file_date_min,
+        "file_date_max": file_date_max,
+        "params": {
+            "short_sma": short_sma,
+            "long_sma": long_sma,
+            "commission_enabled": commission_enabled,
+            "initial_capital": initial_capital,
+        },
     })
 
 
