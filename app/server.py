@@ -27,6 +27,7 @@ from flask import Flask, jsonify, render_template, request
 
 from utils import load_data  # noqa: E402
 from backtest import run_backtest  # noqa: E402
+from turtle import run_turtle_backtest  # noqa: E402
 
 # ── Flask 初始化 ────────────────────────────────────────────────────────────
 
@@ -369,6 +370,137 @@ def backtest():
         "params": {
             "short_sma": short_sma,
             "long_sma": long_sma,
+            "commission_enabled": commission_enabled,
+            "initial_capital": initial_capital,
+        },
+    })
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# API — 海龟交易法则回测
+# ═══════════════════════════════════════════════════════════════════════════
+
+@app.route("/api/turtle", methods=["POST"])
+def turtle_backtest():
+    """
+    运行海龟交易法则回测，返回信号、净值曲线、回撤及绩效指标。
+
+    请求体：
+    {
+        "file": "688256_SH_20210701_20260701.csv",
+        "start_date": "2025-01-01",          // 可选
+        "end_date": "2026-07-01",            // 可选
+        "entry_period": 20,                  // 入场通道周期（唐奇安上轨）
+        "exit_period": 10,                   // 出场通道周期（唐奇安下轨）
+        "atr_period": 14,                    // ATR 周期
+        "add_step": 0.5,                     // 加仓步长（几倍 ATR）
+        "commission_enabled": false,
+        "initial_capital": 100000
+    }
+    """
+    data = request.get_json()
+    filename = data.get("file", "")
+    start_date = data.get("start_date") or None
+    end_date = data.get("end_date") or None
+    entry_period = int(data.get("entry_period", 20))
+    exit_period = int(data.get("exit_period", 10))
+    atr_period = int(data.get("atr_period", 14))
+    add_step = float(data.get("add_step", 0.5))
+    commission_enabled = data.get("commission_enabled", False)
+    initial_capital = float(data.get("initial_capital", 100000))
+
+    # ── 参数校验 ──────────────────────────────────────────────────────────
+    if not filename:
+        return jsonify({"ok": False, "error": "请选择数据文件"}), 400
+
+    filepath = os.path.join(DATA_RAW, filename)
+    if not os.path.exists(filepath):
+        return jsonify({"ok": False, "error": f"文件不存在: {filename}"}), 404
+
+    if entry_period < 2:
+        return jsonify({"ok": False, "error": "入场通道周期最小为 2"}), 400
+    if exit_period < 2:
+        return jsonify({"ok": False, "error": "出场通道周期最小为 2"}), 400
+    if atr_period < 2:
+        return jsonify({"ok": False, "error": "ATR 周期最小为 2"}), 400
+    if add_step <= 0:
+        return jsonify({"ok": False, "error": "加仓步长必须大于 0"}), 400
+    if initial_capital <= 0:
+        return jsonify({"ok": False, "error": "初始资金必须大于 0"}), 400
+
+    # ── 加载数据 ──────────────────────────────────────────────────────────
+    try:
+        df = load_data(filepath)
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"读取文件失败: {e}"}), 500
+
+    raw_dates = df["trade_date"]
+    if not pd.api.types.is_datetime64_any_dtype(raw_dates):
+        raw_dates = pd.to_datetime(raw_dates.astype(str), format="%Y%m%d")
+    file_date_min = raw_dates.min().strftime("%Y-%m-%d")
+    file_date_max = raw_dates.max().strftime("%Y-%m-%d")
+
+    # ── 验证日期范围 ──────────────────────────────────────────────────────
+    if start_date:
+        start_dt = pd.to_datetime(start_date)
+        if start_dt < raw_dates.min():
+            return jsonify({
+                "ok": False,
+                "error": f"起始日期 {start_date} 早于文件最早日期 {file_date_min}"
+            }), 400
+        if start_dt > raw_dates.max():
+            return jsonify({
+                "ok": False,
+                "error": f"起始日期 {start_date} 晚于文件最晚日期 {file_date_max}"
+            }), 400
+    if end_date:
+        end_dt = pd.to_datetime(end_date)
+        if end_dt < raw_dates.min():
+            return jsonify({
+                "ok": False,
+                "error": f"结束日期 {end_date} 早于文件最早日期 {file_date_min}"
+            }), 400
+        if end_dt > raw_dates.max():
+            return jsonify({
+                "ok": False,
+                "error": f"结束日期 {end_date} 晚于文件最晚日期 {file_date_max}"
+            }), 400
+
+    if start_date and end_date:
+        if pd.to_datetime(start_date) >= pd.to_datetime(end_date):
+            return jsonify({"ok": False, "error": "起始日期必须早于结束日期"}), 400
+
+    # ── 运行回测 ──────────────────────────────────────────────────────────
+    commission_rate = 0.0003 if commission_enabled else 0.0
+
+    try:
+        result = run_turtle_backtest(
+            df=df,
+            entry_period=entry_period,
+            exit_period=exit_period,
+            atr_period=atr_period,
+            add_step=add_step,
+            initial_capital=initial_capital,
+            commission_rate=commission_rate,
+            start_date=start_date,
+            end_date=end_date,
+        )
+    except ValueError as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"回测失败: {e}"}), 500
+
+    return jsonify({
+        "ok": True,
+        "data": result["data"],
+        "metrics": result["metrics"],
+        "file_date_min": file_date_min,
+        "file_date_max": file_date_max,
+        "params": {
+            "entry_period": entry_period,
+            "exit_period": exit_period,
+            "atr_period": atr_period,
+            "add_step": add_step,
             "commission_enabled": commission_enabled,
             "initial_capital": initial_capital,
         },

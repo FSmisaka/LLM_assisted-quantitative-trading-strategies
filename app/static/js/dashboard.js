@@ -41,6 +41,21 @@ const elBtReset = $('#btn-bt-reset');
 const elBtStatus = $('#bt-status');
 const elBacktestContainer = $('#backtest-container');
 
+// Turtle elements
+const elTuFile = $('#tu-file');
+const elTuStart = $('#tu-start-date');
+const elTuEnd = $('#tu-end-date');
+const elTuEntryPeriod = $('#tu-entry-period');
+const elTuExitPeriod = $('#tu-exit-period');
+const elTuAtrPeriod = $('#tu-atr-period');
+const elTuAddStep = $('#tu-add-step');
+const elTuCapital = $('#tu-capital');
+const elTuCommission = $('#tu-commission');
+const elTuRun = $('#btn-tu-run');
+const elTuReset = $('#btn-tu-reset');
+const elTuStatus = $('#tu-status');
+const elTurtleContainer = $('#turtle-container');
+
 // ═══════════════════════════ State ═══════════════════════════
 
 let activePanel = 'data';
@@ -48,6 +63,7 @@ let activeInd = 'price_ma';
 let indicatorData = null;
 let lastParams = null;
 let backtestData = null;
+let turtleData = null;
 let fileListCache = [];  // cached file list for backtest date validation
 
 // ═══════════════════════════ Chart Config ═══════════════════
@@ -167,6 +183,10 @@ function openPanel(name) {
     panels.forEach(p => p.classList.toggle('visible', p.id === `panel-${name}`));
   }
 
+  // Hide all result containers first
+  elBacktestContainer.style.display = 'none';
+  elTurtleContainer.style.display = 'none';
+
   // View switching
   if (activePanel === 'backtest') {
     elChartContainer.style.display = 'none';
@@ -178,20 +198,27 @@ function openPanel(name) {
       elChartEmpty.querySelector('p').textContent = '设置参数 → 运行回测 → 查看结果';
     }
     if (backtestData) renderBacktest();
+  } else if (activePanel === 'turtle') {
+    elChartContainer.style.display = 'none';
+    elChartEmpty.style.display = 'none';
+    elTurtleContainer.style.display = turtleData ? 'flex' : 'none';
+    if (!turtleData) {
+      elChartEmpty.style.display = 'flex';
+      elChartEmpty.querySelector('h2').textContent = '海龟交易法则';
+      elChartEmpty.querySelector('p').textContent = '设置参数 → 运行回测 → 查看结果';
+    }
+    if (turtleData) renderTurtle();
   } else if (activePanel && indicatorData) {
-    elBacktestContainer.style.display = 'none';
     elChartEmpty.style.display = 'none';
     elChartContainer.style.display = 'block';
     requestAnimationFrame(() => renderActiveChart());
   } else if (activePanel && !indicatorData) {
-    elBacktestContainer.style.display = 'none';
     elChartContainer.style.display = 'none';
     elChartEmpty.style.display = 'flex';
     elChartEmpty.querySelector('h2').textContent = 'Quant Dashboard';
     elChartEmpty.querySelector('p').textContent = '选择数据源 → 选择指标 → 查看图表';
   } else {
     // Collapsed
-    elBacktestContainer.style.display = 'none';
     if (indicatorData) {
       elChartEmpty.style.display = 'none';
       elChartContainer.style.display = 'block';
@@ -281,8 +308,10 @@ async function loadFiles() {
     ).join('');
     elFile.innerHTML = opts;
     elBtFile.innerHTML = opts;
+    elTuFile.innerHTML = opts;
     if (files.length) elFetchStatus.textContent = `共 ${files.length} 个文件可用`;
     updateBtDatePlaceholders();
+    updateTuDatePlaceholders();
   } catch(e) { elFetchStatus.textContent = '加载文件列表失败'; }
 }
 
@@ -726,6 +755,310 @@ function renderComparisonChart(d, m) {
 }
 
 
+// ═══════════════════════════ Turtle ═════════════════════
+
+function getTuFileMeta() {
+  const name = elTuFile.value;
+  return fileListCache.find(f => f.name === name) || null;
+}
+
+function updateTuDatePlaceholders() {
+  const meta = getTuFileMeta();
+  if (meta && meta.date_min && meta.date_max) {
+    elTuStart.placeholder = meta.date_min;
+    elTuEnd.placeholder = meta.date_max;
+  }
+}
+
+function onTuFileChange() {
+  updateTuDatePlaceholders();
+}
+
+function resetTurtleParams() {
+  elTuEntryPeriod.value = 20;
+  elTuExitPeriod.value = 10;
+  elTuAtrPeriod.value = 14;
+  elTuAddStep.value = 0.5;
+  elTuCapital.value = 100000;
+  elTuCommission.checked = false;
+  elTuStart.value = '';
+  elTuEnd.value = '';
+  updateTuDatePlaceholders();
+  elTuStatus.textContent = '';
+}
+
+async function runTurtle() {
+  const file = elTuFile.value;
+  if (!file) { elTuStatus.textContent = '❌ 请选择数据文件'; return; }
+
+  const entryPeriod = parseInt(elTuEntryPeriod.value);
+  const exitPeriod = parseInt(elTuExitPeriod.value);
+  const atrPeriod = parseInt(elTuAtrPeriod.value);
+  const addStep = parseFloat(elTuAddStep.value);
+
+  if (entryPeriod < 2) { elTuStatus.textContent = '❌ 入场通道周期最小为 2'; return; }
+  if (exitPeriod < 2) { elTuStatus.textContent = '❌ 出场通道周期最小为 2'; return; }
+  if (atrPeriod < 2) { elTuStatus.textContent = '❌ ATR 周期最小为 2'; return; }
+  if (addStep <= 0) { elTuStatus.textContent = '❌ 加仓步长必须大于 0'; return; }
+
+  const capital = parseFloat(elTuCapital.value);
+  if (capital <= 0) { elTuStatus.textContent = '❌ 初始资金必须大于 0'; return; }
+
+  const params = {
+    file,
+    entry_period: entryPeriod,
+    exit_period: exitPeriod,
+    atr_period: atrPeriod,
+    add_step: addStep,
+    commission_enabled: elTuCommission.checked,
+    initial_capital: capital,
+    start_date: elTuStart.value.trim() || null,
+    end_date: elTuEnd.value.trim() || null,
+  };
+
+  elTuRun.disabled = true;
+  elTuStatus.textContent = '⏳ 回测计算中…';
+  try {
+    const resp = await fetch('/api/turtle', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    const r = await resp.json();
+    if (r.ok) {
+      turtleData = r;
+      renderTurtle();
+      elTuStatus.textContent = `✅ 回测完成 — ${r.data.dates.length} 个交易日`;
+    } else {
+      elTuStatus.textContent = `❌ ${r.error}`;
+    }
+  } catch (e) {
+    elTuStatus.textContent = `❌ ${e.message}`;
+  } finally {
+    elTuRun.disabled = false;
+  }
+}
+
+function renderTurtle() {
+  if (!turtleData) return;
+  const d = turtleData.data;
+  const m = turtleData.metrics;
+  const p = turtleData.params;
+
+  elChartEmpty.style.display = 'none';
+  elChartContainer.style.display = 'none';
+  elBacktestContainer.style.display = 'none';
+  elTurtleContainer.style.display = 'flex';
+  _hoverWired = false;
+
+  renderTurtleKPIs(m);
+  renderTurtleMainChart(d, p);
+  renderTurtleDrawdownChart(d);
+  renderTurtleComparisonChart(d, m);
+}
+
+function renderTurtleKPIs(m) {
+  // 年化收益率
+  const ann = m.annual_return;
+  let annCls = 'neutral', annText = 'N/A';
+  if (ann !== null && ann !== undefined) {
+    annText = (ann >= 0 ? '+' : '') + ann.toFixed(2) + '%';
+    annCls = ann > 0 ? 'positive' : (ann < 0 ? 'negative' : 'neutral');
+  }
+  const card = (id, cls, val, label, sub) => {
+    const el = $('#' + id);
+    if (el) { el.className = 'bt-kpi-card ' + cls; el.innerHTML = val + label + sub; }
+  };
+  card('tu-kpi-annual', annCls,
+    `<span class="bt-kpi-value">${annText}</span>`,
+    `<span class="bt-kpi-label">年化收益率</span>`,
+    `<span class="bt-kpi-sub">总收益: ${m.total_return >= 0 ? '+' : ''}${m.total_return.toFixed(2)}%</span>`);
+
+  // 夏普比率
+  const sh = m.sharpe_ratio;
+  let shCls = 'neutral', shText = 'N/A';
+  if (sh !== null && sh !== undefined) {
+    shText = sh.toFixed(2);
+    shCls = sh >= 2 ? 'positive' : (sh >= 1 ? 'warning' : (sh < 0 ? 'negative' : 'neutral'));
+  }
+  card('tu-kpi-sharpe', shCls,
+    `<span class="bt-kpi-value">${shText}</span>`,
+    `<span class="bt-kpi-label">夏普比率</span>`,
+    `<span class="bt-kpi-sub">基准收益: ${m.benchmark_return >= 0 ? '+' : ''}${m.benchmark_return.toFixed(2)}%</span>`);
+
+  // 最大回撤
+  const mdd = m.max_drawdown;
+  let mddCls = 'neutral', mddText = 'N/A';
+  if (mdd !== null && mdd !== undefined) {
+    mddText = mdd.toFixed(2) + '%';
+    mddCls = mdd > -10 ? 'positive' : (mdd > -20 ? 'warning' : 'negative');
+  }
+  card('tu-kpi-drawdown', mddCls,
+    `<span class="bt-kpi-value">${mddText}</span>`,
+    `<span class="bt-kpi-label">最大回撤</span>`,
+    `<span class="bt-kpi-sub">${m.max_drawdown_date || ''}</span>`);
+
+  // 胜率
+  const wr = m.win_rate;
+  let wrCls = 'neutral', wrText = 'N/A';
+  if (wr !== null && wr !== undefined) {
+    wrText = wr.toFixed(1) + '%';
+    wrCls = wr >= 60 ? 'positive' : (wr >= 40 ? 'warning' : (wr < 30 ? 'negative' : 'neutral'));
+  }
+  const plText = m.profit_loss_ratio !== null && m.profit_loss_ratio !== undefined
+    ? '盈亏比 ' + m.profit_loss_ratio.toFixed(2) : '';
+  card('tu-kpi-winrate', wrCls,
+    `<span class="bt-kpi-value">${wrText}</span>`,
+    `<span class="bt-kpi-label">胜率</span>`,
+    `<span class="bt-kpi-sub">${m.trade_count}笔交易${plText ? ' | ' + plText : ''}</span>`);
+}
+
+function renderTurtleMainChart(d, p) {
+  const traces = [
+    {
+      x: d.dates, y: d.close, type: 'scatter', mode: 'lines',
+      line: { color: '#64748b', width: 1.2 },
+      name: 'Close', hovertemplate: '收盘: %{y:.2f}<extra></extra>',
+    },
+    {
+      x: d.dates, y: d.entry_upper, type: 'scatter', mode: 'lines',
+      line: { color: '#f59e0b', width: 1.0, dash: 'dash' },
+      name: `入场通道 (${p.entry_period}日高)`,
+      hovertemplate: '上轨: %{y:.2f}<extra></extra>',
+    },
+    {
+      x: d.dates, y: d.exit_lower, type: 'scatter', mode: 'lines',
+      line: { color: '#3b82f6', width: 1.0, dash: 'dash' },
+      name: `出场通道 (${p.exit_period}日低)`,
+      hovertemplate: '下轨: %{y:.2f}<extra></extra>',
+    },
+    {
+      x: d.dates, y: d.stop_line, type: 'scatter', mode: 'lines',
+      line: { color: 'rgba(168,85,247,0.35)', width: 0.8 },
+      name: '止损线', hovertemplate: '止损: %{y:.2f}<extra></extra>',
+      connectgaps: false,
+    },
+  ];
+
+  // Buy signals — red upward triangles
+  if (d.buy_signals && d.buy_signals.length > 0) {
+    traces.push({
+      x: d.buy_signals.map(s => s.date), y: d.buy_signals.map(s => s.price),
+      type: 'scatter', mode: 'markers',
+      marker: { symbol: 'triangle-up', color: '#ef4444', size: 10, line: { width: 0 } },
+      name: '入场', hovertemplate: '<b>入场</b><br>%{x}<br>¥%{y:.2f}<extra></extra>',
+    });
+  }
+
+  // Add signals — orange upward triangles (smaller)
+  if (d.add_signals && d.add_signals.length > 0) {
+    traces.push({
+      x: d.add_signals.map(s => s.date), y: d.add_signals.map(s => s.price),
+      type: 'scatter', mode: 'markers',
+      marker: { symbol: 'triangle-up', color: '#f97316', size: 8, line: { width: 0 } },
+      name: '加仓', hovertemplate: '<b>加仓</b><br>%{x}<br>¥%{y:.2f}<extra></extra>',
+    });
+  }
+
+  // Sell signals — green downward triangles
+  if (d.sell_signals && d.sell_signals.length > 0) {
+    traces.push({
+      x: d.sell_signals.map(s => s.date), y: d.sell_signals.map(s => s.price),
+      type: 'scatter', mode: 'markers',
+      marker: { symbol: 'triangle-down', color: '#10b981', size: 10, line: { width: 0 } },
+      name: '出场 (通道)', hovertemplate: '<b>出场</b><br>%{x}<br>¥%{y:.2f}<extra></extra>',
+    });
+  }
+
+  // Stop-loss signals — purple cross markers
+  if (d.stop_signals && d.stop_signals.length > 0) {
+    traces.push({
+      x: d.stop_signals.map(s => s.date), y: d.stop_signals.map(s => s.price),
+      type: 'scatter', mode: 'markers',
+      marker: { symbol: 'x', color: '#a855f7', size: 10, line: { width: 2 } },
+      name: '止损', hovertemplate: '<b>止损</b><br>%{x}<br>¥%{y:.2f}<extra></extra>',
+    });
+  }
+
+  const layout = {
+    ...chartLayout('价格 (CNY)'),
+    title: { text: '海龟交易信号', font: { size: 13, color: '#374151' }, x: 0.01, y: 0.98 },
+    margin: { l: 60, r: 24, t: 36, b: 40 },
+  };
+
+  Plotly.react('tu-chart-main', traces, layout, PLOTLY_CONFIG);
+}
+
+function renderTurtleDrawdownChart(d) {
+  const dd = d.drawdown;
+  const traces = [
+    {
+      x: d.dates, y: dd, type: 'scatter', mode: 'none',
+      fill: 'tozeroy', fillcolor: 'rgba(239,68,68,0.12)',
+      name: '回撤', hoverinfo: 'skip', showlegend: false,
+    },
+    {
+      x: d.dates, y: dd, type: 'scatter', mode: 'lines',
+      line: { color: '#ef4444', width: 1.1 },
+      name: '回撤 %', hovertemplate: '回撤: %{y:.2f}%<extra></extra>',
+    },
+    {
+      x: [d.dates[0], d.dates[d.dates.length - 1]], y: [0, 0],
+      type: 'scatter', mode: 'lines',
+      line: { color: 'rgba(0,0,0,0.08)', width: 0.5 },
+      name: '0%', hoverinfo: 'skip', showlegend: false,
+    },
+  ];
+
+  const layout = {
+    ...chartLayout('回撤 (%)'),
+    title: { text: '回撤曲线', font: { size: 12, color: '#374151' }, x: 0.01, y: 0.98 },
+    margin: { l: 55, r: 18, t: 36, b: 40 },
+    yaxis: {
+      ...chartLayout().yaxis,
+      title: { text: '回撤 (%)', font: { size: 10, color: '#6b7280' }, standoff: 6 },
+    },
+  };
+
+  Plotly.react('tu-chart-dd', traces, layout, PLOTLY_CONFIG);
+}
+
+function renderTurtleComparisonChart(d, m) {
+  const traces = [
+    {
+      x: d.dates, y: d.portfolio_value, type: 'scatter', mode: 'lines',
+      line: { color: '#dc2626', width: 1.6 },
+      name: '海龟策略',
+      hovertemplate: '策略: ¥%{y:,.2f}<extra></extra>',
+    },
+    {
+      x: d.dates, y: d.benchmark_value, type: 'scatter', mode: 'lines',
+      line: { color: '#9ca3af', width: 1.0, dash: 'dash' },
+      name: '买入持有 (基准)',
+      hovertemplate: '基准: ¥%{y:,.2f}<extra></extra>',
+    },
+    {
+      x: [d.dates[0], d.dates[d.dates.length - 1]],
+      y: [m.initial_capital, m.initial_capital],
+      type: 'scatter', mode: 'lines',
+      line: { color: 'rgba(0,0,0,0.06)', width: 0.5 },
+      name: '初始资金', hoverinfo: 'skip', showlegend: false,
+    },
+  ];
+
+  const layout = {
+    ...chartLayout('组合净值 (CNY)'),
+    title: { text: '策略 vs 基准', font: { size: 12, color: '#374151' }, x: 0.01, y: 0.98 },
+    margin: { l: 65, r: 18, t: 36, b: 40 },
+    yaxis: {
+      ...chartLayout().yaxis,
+      title: { text: '净值 (CNY)', font: { size: 10, color: '#6b7280' }, standoff: 8 },
+    },
+  };
+
+  Plotly.react('tu-chart-cmp', traces, layout, PLOTLY_CONFIG);
+}
+
+
 // ═══════════════════════════ Events ═══════════════════════
 
 window.setCode = code => { elTsCode.value = code; };
@@ -745,12 +1078,22 @@ elBtFile.addEventListener('change', onBtFileChange);
   el.addEventListener('keydown', e => { if (e.key === 'Enter') runBacktest(); });
 });
 
+// Turtle events
+elTuRun.addEventListener('click', runTurtle);
+elTuReset.addEventListener('click', resetTurtleParams);
+elTuFile.addEventListener('change', onTuFileChange);
+[elTuStart, elTuEnd].forEach(el => {
+  el.addEventListener('keydown', e => { if (e.key === 'Enter') runTurtle(); });
+});
+
 let resizeTimer;
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
     if (activePanel === 'backtest' && backtestData) {
       renderBacktest();
+    } else if (activePanel === 'turtle' && turtleData) {
+      renderTurtle();
     } else if (indicatorData) {
       renderActiveChart();
     }
@@ -765,4 +1108,5 @@ window.addEventListener('resize', () => {
   openPanel('data');
   if (elFile.value) await computeAndRender();
   onBtFileChange();
+  onTuFileChange();
 })();
