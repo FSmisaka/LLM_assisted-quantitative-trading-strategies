@@ -1,0 +1,989 @@
+{
+  "config": {
+    "model_type": "random_forest",
+    "task_type": "regression",
+    "top_n": 30,
+    "train_ratio": 0.6,
+    "val_ratio": 0.2,
+    "test_ratio": 0.2
+  },
+  "data_summary": {
+    "n_rows": 39616,
+    "n_stocks": 4281,
+    "n_quarters": 10,
+    "date_min": "2020-03-31",
+    "date_max": "2022-06-30",
+    "columns": [
+      "date",
+      "code",
+      "ev_ebitda",
+      "pb",
+      "pcf",
+      "市现率PCF(经营现金流TTM)",
+      "pe",
+      "市盈率PE(TTM,扣除非经常性损益)",
+      "ps",
+      "dividend_yield",
+      "mv",
+      "净利润同比增长率",
+      "equity_growth",
+      "profit_growth",
+      "eps_growth",
+      "asset_growth",
+      "cashflow_growth",
+      "经营活动产生的现金流量净额(同比增长率)",
+      "operating_profit_growth",
+      "revenue_growth",
+      "营业收入(同比增长率)",
+      "target",
+      "quarter"
+    ]
+  },
+  "train_quarters": [
+    "2020Q1",
+    "2020Q2",
+    "2020Q3",
+    "2020Q4",
+    "2021Q1",
+    "2021Q2"
+  ],
+  "val_quarters": [
+    "2021Q3",
+    "2021Q4"
+  ],
+  "test_quarters": [
+    "2022Q1",
+    "2022Q2"
+  ],
+  "model_metrics": {
+    "val_ic_mean": 0.013952192566693777,
+    "val_rank_ic_mean": -0.0006536833677282337,
+    "val_ic_std": 0.011320271930884801,
+    "val_icir": 1.232496237888807,
+    "val_mse": 0.08750062118489584,
+    "val_rmse": 0.29580503914723266,
+    "val_mae": 0.21137419074861824,
+    "val_r2": -0.246450840355398,
+    "test_ic_mean": 0.16837299613358522,
+    "test_rank_ic_mean": 0.21988997587504244,
+    "test_ic_std": 0.046433129514393066,
+    "test_icir": 3.6261393081720663,
+    "test_mse": 0.04098936361142655,
+    "test_rmse": 0.20245830092003278,
+    "test_mae": 0.15881416624341957,
+    "test_r2": -0.14837822303674697
+  },
+  "feature_importance": [
+    {
+      "feature": "pe_inv",
+      "importance": 0.23542995475216114
+    },
+    {
+      "feature": "eps_growth",
+      "importance": 0.0918782182646727
+    },
+    {
+      "feature": "profit_growth",
+      "importance": 0.061060700863662436
+    },
+    {
+      "feature": "pe",
+      "importance": 0.04953238030437421
+    },
+    {
+      "feature": "ev_ebitda",
+      "importance": 0.048460266833266846
+    },
+    {
+      "feature": "operating_profit_growth",
+      "importance": 0.04813743040471267
+    },
+    {
+      "feature": "净利润同比增长率",
+      "importance": 0.03695429567116979
+    },
+    {
+      "feature": "pb_inv",
+      "importance": 0.036238738006717675
+    },
+    {
+      "feature": "equity_growth",
+      "importance": 0.03322081842243064
+    },
+    {
+      "feature": "ln_mv",
+      "importance": 0.032693969154126805
+    },
+    {
+      "feature": "mv",
+      "importance": 0.03215386010016989
+    },
+    {
+      "feature": "市盈率PE(TTM,扣除非经常性损益)",
+      "importance": 0.0320381962500336
+    },
+    {
+      "feature": "pb",
+      "importance": 0.03114317896624189
+    },
+    {
+      "feature": "经营活动产生的现金流量净额(同比增长率)",
+      "importance": 0.028782480525155005
+    },
+    {
+      "feature": "dividend_yield",
+      "importance": 0.02794630448441774
+    },
+    {
+      "feature": "asset_growth",
+      "importance": 0.026940215277522946
+    },
+    {
+      "feature": "市现率PCF(经营现金流TTM)",
+      "importance": 0.025932222826541812
+    },
+    {
+      "feature": "cashflow_growth",
+      "importance": 0.02495845817279684
+    },
+    {
+      "feature": "pcf",
+      "importance": 0.024052357207930905
+    },
+    {
+      "feature": "营业收入(同比增长率)",
+      "importance": 0.019578914321497734
+    }
+  ],
+  "feature_cols": [
+    "ev_ebitda",
+    "pb",
+    "pcf",
+    "市现率PCF(经营现金流TTM)",
+    "pe",
+    "市盈率PE(TTM,扣除非经常性损益)",
+    "ps",
+    "dividend_yield",
+    "mv",
+    "净利润同比增长率",
+    "equity_growth",
+    "profit_growth",
+    "eps_growth",
+    "asset_growth",
+    "cashflow_growth",
+    "经营活动产生的现金流量净额(同比增长率)",
+    "operating_profit_growth",
+    "revenue_growth",
+    "营业收入(同比增长率)",
+    "ln_mv",
+    "pe_inv",
+    "pb_inv",
+    "ps_inv"
+  ],
+  "quarterly_predictions": [
+    {
+      "quarter": "2021Q3",
+      "n_stocks": 4098,
+      "pred_mean": 0.061163,
+      "pred_std": 0.056501,
+      "pred_min": -0.13408,
+      "pred_max": 0.282863,
+      "actual_mean": 0.113635
+    },
+    {
+      "quarter": "2021Q4",
+      "n_stocks": 4173,
+      "pred_mean": 0.128245,
+      "pred_std": 0.060038,
+      "pred_min": -0.021678,
+      "pred_max": 0.359041,
+      "actual_mean": -0.083747
+    },
+    {
+      "quarter": "2022Q1",
+      "n_stocks": 4228,
+      "pred_mean": 0.086826,
+      "pred_std": 0.061591,
+      "pred_min": -0.143372,
+      "pred_max": 0.365541,
+      "actual_mean": 0.010724
+    },
+    {
+      "quarter": "2022Q2",
+      "n_stocks": 4262,
+      "pred_mean": 0.013416,
+      "pred_std": 0.047725,
+      "pred_min": -0.087622,
+      "pred_max": 0.217541,
+      "actual_mean": -0.091981
+    }
+  ],
+  "backtest_metrics": {
+    "n_quarters": 4,
+    "cumulative_return": 33.11,
+    "annual_return": 33.11,
+    "sharpe_ratio": 2.023,
+    "max_drawdown": 0.0,
+    "max_drawdown_quarter": "2021Q3",
+    "win_rate": 100.0,
+    "excess_win_rate": 100.0,
+    "benchmark_cumulative_return": -6.35,
+    "benchmark_annual_return": -6.35,
+    "final_value": 1331091.7,
+    "initial_capital": 1000000.0
+  },
+  "quarterly_results": [
+    {
+      "quarter": "2021Q3",
+      "n_selected": 30,
+      "strategy_return": 0.19991333333333333,
+      "benchmark_return": 0.11363491947291363,
+      "excess_return": 0.0862784138604197,
+      "selected_codes": [
+        2592,
+        670,
+        2325,
+        300077,
+        2411,
+        600777,
+        600684,
+        607,
+        2858,
+        2805
+      ]
+    },
+    {
+      "quarter": "2021Q4",
+      "n_selected": 30,
+      "strategy_return": 0.006963333333333351,
+      "benchmark_return": -0.08374728013419602,
+      "excess_return": 0.09071061346752937,
+      "selected_codes": [
+        600734,
+        600460,
+        603290,
+        2192,
+        300604,
+        600696,
+        300661,
+        300390,
+        603392,
+        603032
+      ]
+    },
+    {
+      "quarter": "2022Q1",
+      "n_selected": 30,
+      "strategy_return": 0.07760000000000002,
+      "benchmark_return": 0.010724408703878904,
+      "excess_return": 0.06687559129612111,
+      "selected_codes": [
+        506,
+        300071,
+        603803,
+        600078,
+        2848,
+        571,
+        300340,
+        600121,
+        600515,
+        2072
+      ]
+    },
+    {
+      "quarter": "2022Q2",
+      "n_selected": 30,
+      "strategy_return": 0.022319999999999986,
+      "benchmark_return": -0.09198092444861566,
+      "excess_return": 0.11430092444861564,
+      "selected_codes": [
+        525,
+        587,
+        2086,
+        600287,
+        806,
+        2535,
+        609,
+        2513,
+        603392,
+        600547
+      ]
+    }
+  ],
+  "nav_curve": {
+    "quarters": [
+      "2021Q3",
+      "2021Q4",
+      "2022Q1",
+      "2022Q2"
+    ],
+    "portfolio_value": [
+      1199913.3333333335,
+      1208268.7298444447,
+      1302030.3832803736,
+      1331091.7014351916
+    ],
+    "benchmark_value": [
+      1113634.9194729135,
+      1020371.0239045925,
+      1031313.8997945407,
+      936452.6938947319
+    ],
+    "drawdown": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "cumulative_return_pct": [
+      19.9913,
+      20.8269,
+      30.203,
+      33.1092
+    ]
+  },
+  "ic_series": [
+    {
+      "quarter": "2021Q3",
+      "ic": 0.002631920635808976,
+      "rank_ic": -0.025335897074289026
+    },
+    {
+      "quarter": "2021Q4",
+      "ic": 0.025272464497578577,
+      "rank_ic": 0.02402853033883256
+    },
+    {
+      "quarter": "2022Q1",
+      "ic": 0.2148061256479783,
+      "rank_ic": 0.2660863770501443
+    },
+    {
+      "quarter": "2022Q2",
+      "ic": 0.12193986661919216,
+      "rank_ic": 0.17369357469994057
+    }
+  ],
+  "top_picks": [
+    {
+      "quarter": "2021Q3",
+      "picks": [
+        {
+          "code": "2592",
+          "prediction": 0.282863,
+          "actual": 0.1164
+        },
+        {
+          "code": "670",
+          "prediction": 0.279305,
+          "actual": 2.1156
+        },
+        {
+          "code": "2325",
+          "prediction": 0.272144,
+          "actual": 0.1673
+        },
+        {
+          "code": "300077",
+          "prediction": 0.266504,
+          "actual": -0.1113
+        },
+        {
+          "code": "2411",
+          "prediction": 0.252015,
+          "actual": -0.165
+        },
+        {
+          "code": "600777",
+          "prediction": 0.25095,
+          "actual": -0.1587
+        },
+        {
+          "code": "600684",
+          "prediction": 0.250481,
+          "actual": 0.0723
+        },
+        {
+          "code": "607",
+          "prediction": 0.244902,
+          "actual": 0.4791
+        },
+        {
+          "code": "2858",
+          "prediction": 0.241429,
+          "actual": 0.0139
+        },
+        {
+          "code": "2805",
+          "prediction": 0.238639,
+          "actual": 0.3312
+        },
+        {
+          "code": "300162",
+          "prediction": 0.237624,
+          "actual": 0.2198
+        },
+        {
+          "code": "300307",
+          "prediction": 0.236224,
+          "actual": 0.0274
+        },
+        {
+          "code": "2779",
+          "prediction": 0.231385,
+          "actual": 0.3514
+        },
+        {
+          "code": "2400",
+          "prediction": 0.230839,
+          "actual": 0.14
+        },
+        {
+          "code": "2488",
+          "prediction": 0.23008,
+          "actual": 0.554
+        },
+        {
+          "code": "5",
+          "prediction": 0.222584,
+          "actual": 0.09
+        },
+        {
+          "code": "2670",
+          "prediction": 0.219236,
+          "actual": 0.0492
+        },
+        {
+          "code": "933",
+          "prediction": 0.218623,
+          "actual": -0.1826
+        },
+        {
+          "code": "993",
+          "prediction": 0.217182,
+          "actual": -0.2396
+        },
+        {
+          "code": "545",
+          "prediction": 0.216944,
+          "actual": -0.1228
+        },
+        {
+          "code": "761",
+          "prediction": 0.215731,
+          "actual": -0.1457
+        },
+        {
+          "code": "300681",
+          "prediction": 0.214794,
+          "actual": 0.3052
+        },
+        {
+          "code": "300139",
+          "prediction": 0.21182,
+          "actual": 0.1334
+        },
+        {
+          "code": "600078",
+          "prediction": 0.210194,
+          "actual": 0.56
+        },
+        {
+          "code": "300618",
+          "prediction": 0.207315,
+          "actual": 0.0698
+        },
+        {
+          "code": "2407",
+          "prediction": 0.207287,
+          "actual": -0.1589
+        },
+        {
+          "code": "2850",
+          "prediction": 0.206183,
+          "actual": 0.2305
+        },
+        {
+          "code": "300710",
+          "prediction": 0.206163,
+          "actual": 0.0514
+        },
+        {
+          "code": "300769",
+          "prediction": 0.205817,
+          "actual": 0.0127
+        },
+        {
+          "code": "603032",
+          "prediction": 0.204986,
+          "actual": 1.1914
+        }
+      ]
+    },
+    {
+      "quarter": "2021Q4",
+      "picks": [
+        {
+          "code": "600734",
+          "prediction": 0.359041,
+          "actual": 3.8096
+        },
+        {
+          "code": "600460",
+          "prediction": 0.35435,
+          "actual": -0.1052
+        },
+        {
+          "code": "603290",
+          "prediction": 0.353859,
+          "actual": 0.0147
+        },
+        {
+          "code": "2192",
+          "prediction": 0.345494,
+          "actual": -0.1211
+        },
+        {
+          "code": "300604",
+          "prediction": 0.344354,
+          "actual": -0.3633
+        },
+        {
+          "code": "600696",
+          "prediction": 0.341612,
+          "actual": -0.2349
+        },
+        {
+          "code": "300661",
+          "prediction": 0.33913,
+          "actual": 0.0567
+        },
+        {
+          "code": "300390",
+          "prediction": 0.338565,
+          "actual": -0.1099
+        },
+        {
+          "code": "603392",
+          "prediction": 0.337643,
+          "actual": 0.2551
+        },
+        {
+          "code": "603032",
+          "prediction": 0.337215,
+          "actual": -0.2357
+        },
+        {
+          "code": "300750",
+          "prediction": 0.336959,
+          "actual": -0.1287
+        },
+        {
+          "code": "2049",
+          "prediction": 0.336737,
+          "actual": -0.0909
+        },
+        {
+          "code": "300769",
+          "prediction": 0.336603,
+          "actual": 0.1579
+        },
+        {
+          "code": "301096",
+          "prediction": 0.329844,
+          "actual": -0.0314
+        },
+        {
+          "code": "300775",
+          "prediction": 0.32895,
+          "actual": -0.1536
+        },
+        {
+          "code": "408",
+          "prediction": 0.328785,
+          "actual": -0.2639
+        },
+        {
+          "code": "300681",
+          "prediction": 0.328429,
+          "actual": -0.1731
+        },
+        {
+          "code": "762",
+          "prediction": 0.327951,
+          "actual": -0.2477
+        },
+        {
+          "code": "301050",
+          "prediction": 0.326802,
+          "actual": -0.3816
+        },
+        {
+          "code": "301071",
+          "prediction": 0.326778,
+          "actual": 0.0461
+        },
+        {
+          "code": "300071",
+          "prediction": 0.323752,
+          "actual": 0.0148
+        },
+        {
+          "code": "605111",
+          "prediction": 0.323593,
+          "actual": -0.176
+        },
+        {
+          "code": "605358",
+          "prediction": 0.323129,
+          "actual": -0.2593
+        },
+        {
+          "code": "300346",
+          "prediction": 0.320794,
+          "actual": -0.1249
+        },
+        {
+          "code": "300593",
+          "prediction": 0.320089,
+          "actual": -0.1569
+        },
+        {
+          "code": "2371",
+          "prediction": 0.316001,
+          "actual": -0.2104
+        },
+        {
+          "code": "2709",
+          "prediction": 0.314287,
+          "actual": -0.1801
+        },
+        {
+          "code": "2460",
+          "prediction": 0.313247,
+          "actual": -0.1204
+        },
+        {
+          "code": "982",
+          "prediction": 0.312782,
+          "actual": -0.3056
+        },
+        {
+          "code": "300568",
+          "prediction": 0.310148,
+          "actual": 0.0286
+        }
+      ]
+    },
+    {
+      "quarter": "2022Q1",
+      "picks": [
+        {
+          "code": "506",
+          "prediction": 0.365541,
+          "actual": 0.059
+        },
+        {
+          "code": "300071",
+          "prediction": 0.346298,
+          "actual": 0.1898
+        },
+        {
+          "code": "603803",
+          "prediction": 0.34525,
+          "actual": 0.0747
+        },
+        {
+          "code": "600078",
+          "prediction": 0.331048,
+          "actual": 0.0897
+        },
+        {
+          "code": "2848",
+          "prediction": 0.326226,
+          "actual": 0.1006
+        },
+        {
+          "code": "571",
+          "prediction": 0.317087,
+          "actual": 0.0291
+        },
+        {
+          "code": "300340",
+          "prediction": 0.316223,
+          "actual": 0.0999
+        },
+        {
+          "code": "600121",
+          "prediction": 0.314509,
+          "actual": 0.3674
+        },
+        {
+          "code": "600515",
+          "prediction": 0.308283,
+          "actual": -0.0478
+        },
+        {
+          "code": "2072",
+          "prediction": 0.306145,
+          "actual": 0.2186
+        },
+        {
+          "code": "600545",
+          "prediction": 0.302669,
+          "actual": 0.1538
+        },
+        {
+          "code": "2343",
+          "prediction": 0.301076,
+          "actual": 0.1595
+        },
+        {
+          "code": "300256",
+          "prediction": 0.295882,
+          "actual": 0.0232
+        },
+        {
+          "code": "300681",
+          "prediction": 0.295878,
+          "actual": 0.2995
+        },
+        {
+          "code": "300013",
+          "prediction": 0.291566,
+          "actual": 0.2401
+        },
+        {
+          "code": "300068",
+          "prediction": 0.287278,
+          "actual": 0.2204
+        },
+        {
+          "code": "600340",
+          "prediction": 0.282667,
+          "actual": -0.1645
+        },
+        {
+          "code": "2510",
+          "prediction": 0.282205,
+          "actual": 0.0941
+        },
+        {
+          "code": "981",
+          "prediction": 0.281958,
+          "actual": 0.1143
+        },
+        {
+          "code": "2872",
+          "prediction": 0.281567,
+          "actual": -0.102
+        },
+        {
+          "code": "300338",
+          "prediction": 0.279352,
+          "actual": -0.5385
+        },
+        {
+          "code": "600225",
+          "prediction": 0.278026,
+          "actual": 0.0346
+        },
+        {
+          "code": "600758",
+          "prediction": 0.277192,
+          "actual": 0.0864
+        },
+        {
+          "code": "2494",
+          "prediction": 0.275049,
+          "actual": -0.0886
+        },
+        {
+          "code": "300050",
+          "prediction": 0.273651,
+          "actual": -0.0726
+        },
+        {
+          "code": "300080",
+          "prediction": 0.268894,
+          "actual": 0.123
+        },
+        {
+          "code": "300044",
+          "prediction": 0.267344,
+          "actual": 0.3622
+        },
+        {
+          "code": "2766",
+          "prediction": 0.265732,
+          "actual": 0.2702
+        },
+        {
+          "code": "2432",
+          "prediction": 0.265295,
+          "actual": -0.1971
+        },
+        {
+          "code": "523",
+          "prediction": 0.263641,
+          "actual": 0.129
+        }
+      ]
+    },
+    {
+      "quarter": "2022Q2",
+      "picks": [
+        {
+          "code": "525",
+          "prediction": 0.217541,
+          "actual": 0.0403
+        },
+        {
+          "code": "587",
+          "prediction": 0.217047,
+          "actual": 0.1545
+        },
+        {
+          "code": "2086",
+          "prediction": 0.201778,
+          "actual": 0.343
+        },
+        {
+          "code": "600287",
+          "prediction": 0.191914,
+          "actual": -0.0241
+        },
+        {
+          "code": "806",
+          "prediction": 0.189725,
+          "actual": -0.0622
+        },
+        {
+          "code": "2535",
+          "prediction": 0.18667,
+          "actual": 0.142
+        },
+        {
+          "code": "609",
+          "prediction": 0.183756,
+          "actual": 0.0174
+        },
+        {
+          "code": "2513",
+          "prediction": 0.180383,
+          "actual": 0.0039
+        },
+        {
+          "code": "603392",
+          "prediction": 0.175114,
+          "actual": -0.2634
+        },
+        {
+          "code": "600547",
+          "prediction": 0.174245,
+          "actual": -0.0744
+        },
+        {
+          "code": "300124",
+          "prediction": 0.173212,
+          "actual": -0.1269
+        },
+        {
+          "code": "2192",
+          "prediction": 0.170817,
+          "actual": -0.2677
+        },
+        {
+          "code": "603613",
+          "prediction": 0.170078,
+          "actual": 0.2185
+        },
+        {
+          "code": "38",
+          "prediction": 0.169733,
+          "actual": 0.0313
+        },
+        {
+          "code": "300338",
+          "prediction": 0.169423,
+          "actual": 0.2946
+        },
+        {
+          "code": "600522",
+          "prediction": 0.169066,
+          "actual": -0.0229
+        },
+        {
+          "code": "2193",
+          "prediction": 0.168071,
+          "actual": 0.0388
+        },
+        {
+          "code": "300661",
+          "prediction": 0.166788,
+          "actual": -0.226
+        },
+        {
+          "code": "2594",
+          "prediction": 0.165194,
+          "actual": -0.244
+        },
+        {
+          "code": "300309",
+          "prediction": 0.163945,
+          "actual": -0.0248
+        },
+        {
+          "code": "300256",
+          "prediction": 0.16278,
+          "actual": 1.5288
+        },
+        {
+          "code": "768",
+          "prediction": 0.161853,
+          "actual": -0.1393
+        },
+        {
+          "code": "2211",
+          "prediction": 0.161674,
+          "actual": -0.19
+        },
+        {
+          "code": "603586",
+          "prediction": 0.161222,
+          "actual": 0.0372
+        },
+        {
+          "code": "2485",
+          "prediction": 0.158035,
+          "actual": 0.087
+        },
+        {
+          "code": "300089",
+          "prediction": 0.157748,
+          "actual": 0.0726
+        },
+        {
+          "code": "603659",
+          "prediction": 0.157525,
+          "actual": -0.3389
+        },
+        {
+          "code": "2309",
+          "prediction": 0.156083,
+          "actual": 0.1518
+        },
+        {
+          "code": "600260",
+          "prediction": 0.156023,
+          "actual": -0.1975
+        },
+        {
+          "code": "2709",
+          "prediction": 0.154398,
+          "actual": -0.29
+        }
+      ]
+    }
+  ]
+}

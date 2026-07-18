@@ -36,6 +36,10 @@
         <span class="sb-icon-symbol">🐢</span>
         <span class="sb-icon-label">海龟</span>
       </button>
+      <button class="sb-icon" data-panel="ml" title="ML量化">
+        <span class="sb-icon-symbol">🤖</span>
+        <span class="sb-icon-label">ML量化</span>
+      </button>
     </div>
 
     <!-- Panel: Data Source ═══════════════════ -->
@@ -199,6 +203,58 @@
       </div>
       <div id="tu-status" class="status-msg"></div>
     </div>
+
+    <!-- Panel: ML Quant 机器学习量化 -->
+    <div class="sb-panel" id="panel-ml">
+      <h3 class="panel-heading">🤖 ML 量化分析</h3>
+
+      <div class="field">
+        <label>数据文件</label>
+        <select id="ml-file"></select>
+      </div>
+
+      <div class="field">
+        <label>模型类型</label>
+        <select id="ml-model-type">
+          <option value="random_forest">随机森林 (Random Forest)</option>
+          <option value="decision_tree">决策树 (Decision Tree)</option>
+          <option value="linear">线性回归 (Linear)</option>
+          <option value="xgboost">XGBoost</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>任务类型</label>
+        <select id="ml-task-type">
+          <option value="regression">回归 (Regression)</option>
+          <option value="classification">分类 (Classification)</option>
+        </select>
+      </div>
+
+      <div class="field-row">
+        <div class="field"><label>每期选股数</label><input type="number" id="ml-top-n" value="30" min="5" max="100"></div>
+        <div class="field"><label>去极值(%)</label><input type="number" id="ml-winsorize" value="1" min="0" max="10" step="0.5"></div>
+      </div>
+
+      <div class="field-row">
+        <div class="field"><label>训练比例</label><input type="number" id="ml-train-ratio" value="0.6" min="0.3" max="0.8" step="0.05"></div>
+        <div class="field"><label>验证比例</label><input type="number" id="ml-val-ratio" value="0.2" min="0.1" max="0.3" step="0.05"></div>
+      </div>
+
+      <div class="field field-inline">
+        <label class="toggle-label">
+          <input type="checkbox" id="ml-standardize" checked>
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          因子标准化
+        </label>
+      </div>
+
+      <div class="bt-actions">
+        <button id="btn-ml-analyze" class="btn accent full">▶ 运行分析</button>
+        <button id="btn-ml-compare" class="btn full btn-outline">🔬 多模型对比</button>
+      </div>
+      <div id="ml-status" class="status-msg"></div>
+    </div>
   </nav>
 
   <!-- ═══════════════ Chart ═══════════════ -->
@@ -242,6 +298,69 @@
         <div id="bt-chart-dd" class="bt-chart bt-chart-half"></div>
         <div id="bt-chart-cmp" class="bt-chart bt-chart-half"></div>
       </div>
+    </div>
+
+    <!-- ════════ ML Results ════════ -->
+    <div id="ml-container">
+      <!-- KPI Cards -->
+      <div class="bt-kpi-row" id="ml-kpi-row">
+        <div class="bt-kpi-card" id="ml-kpi-annual">
+          <span class="bt-kpi-value">--</span>
+          <span class="bt-kpi-label">年化收益率</span>
+          <span class="bt-kpi-sub"></span>
+        </div>
+        <div class="bt-kpi-card" id="ml-kpi-sharpe">
+          <span class="bt-kpi-value">--</span>
+          <span class="bt-kpi-label">夏普比率</span>
+          <span class="bt-kpi-sub"></span>
+        </div>
+        <div class="bt-kpi-card" id="ml-kpi-drawdown">
+          <span class="bt-kpi-value">--</span>
+          <span class="bt-kpi-label">最大回撤</span>
+          <span class="bt-kpi-sub"></span>
+        </div>
+        <div class="bt-kpi-card" id="ml-kpi-winrate">
+          <span class="bt-kpi-value">--</span>
+          <span class="bt-kpi-label">胜率</span>
+          <span class="bt-kpi-sub"></span>
+        </div>
+        <div class="bt-kpi-card" id="ml-kpi-ic">
+          <span class="bt-kpi-value">--</span>
+          <span class="bt-kpi-label">Rank IC (Mean)</span>
+          <span class="bt-kpi-sub"></span>
+        </div>
+      </div>
+
+      <!-- Model Metrics Row -->
+      <div class="bt-kpi-row" id="ml-model-metrics-row" style="display:none;">
+        <div class="bt-kpi-card" id="ml-metric-r2">
+          <span class="bt-kpi-value">--</span>
+          <span class="bt-kpi-label">R² / Accuracy</span>
+          <span class="bt-kpi-sub"></span>
+        </div>
+        <div class="bt-kpi-card" id="ml-metric-mse">
+          <span class="bt-kpi-value">--</span>
+          <span class="bt-kpi-label">MSE</span>
+          <span class="bt-kpi-sub"></span>
+        </div>
+        <div class="bt-kpi-card" id="ml-metric-mae">
+          <span class="bt-kpi-value">--</span>
+          <span class="bt-kpi-label">MAE</span>
+          <span class="bt-kpi-sub"></span>
+        </div>
+      </div>
+
+      <!-- Cumulative NAV Chart -->
+      <div id="ml-chart-nav" class="bt-chart bt-chart-ma" style="flex: 2.2;"></div>
+
+      <!-- Bottom row: Quarterly returns + Feature importance -->
+      <div class="bt-chart-row">
+        <div id="ml-chart-quarterly" class="bt-chart bt-chart-half"></div>
+        <div id="ml-chart-importance" class="bt-chart bt-chart-half"></div>
+      </div>
+
+      <!-- IC Series Chart -->
+      <div id="ml-chart-ic" class="bt-chart bt-chart-ma" style="flex: 1.2;"></div>
     </div>
 
     <!-- ════════ Turtle Results ════════ -->

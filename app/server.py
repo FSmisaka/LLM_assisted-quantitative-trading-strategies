@@ -508,6 +508,226 @@ def turtle_backtest():
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# API — ML 量化分析
+# ═══════════════════════════════════════════════════════════════════════════
+
+from ml_quant import (  # noqa: E402
+    MLQuantConfig,
+    MODEL_CHOICES,
+    TASK_CHOICES,
+    compare_models,
+    make_json_safe,
+    run_ml_pipeline,
+)
+
+ML_DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "raw")
+
+
+def _list_ml_files() -> list[dict]:
+    """列出 data/raw 和 data/processed 下所有 CSV 文件。"""
+    files = []
+    for dirpath in [ML_DATA_DIR, os.path.join(os.path.dirname(__file__), "..", "data", "processed")]:
+        if not os.path.isdir(dirpath):
+            continue
+        for f in sorted(os.listdir(dirpath)):
+            if f.endswith(".csv"):
+                path = os.path.join(dirpath, f)
+                try:
+                    df = pd.read_csv(path, nrows=5)
+                    files.append({
+                        "name": f,
+                        "path": path,
+                        "dir": os.path.basename(dirpath),
+                        "cols": list(df.columns),
+                        "n_cols": len(df.columns),
+                    })
+                except Exception:
+                    files.append({"name": f, "path": path, "dir": os.path.basename(dirpath), "error": "无法读取"})
+    return files
+
+
+@app.route("/api/ml/files")
+def ml_list_files():
+    """返回可用于 ML 分析的 CSV 文件列表。"""
+    return jsonify({"ok": True, "files": _list_ml_files()})
+
+
+@app.route("/api/ml/data-preview", methods=["POST"])
+def ml_data_preview():
+    """预览数据文件的前 N 行和列信息。
+
+    请求体：{"file": "stock_factor_panel_data.csv.csv"}
+    """
+    data = request.get_json()
+    filename = data.get("file", "")
+
+    if not filename:
+        return jsonify({"ok": False, "error": "请指定数据文件"}), 400
+
+    # 查找文件
+    filepath = None
+    for f_info in _list_ml_files():
+        if f_info["name"] == filename:
+            filepath = f_info["path"]
+            break
+
+    if filepath is None:
+        return jsonify({"ok": False, "error": f"文件不存在: {filename}"}), 404
+
+    try:
+        df = pd.read_csv(filepath, encoding="utf-8-sig")
+        n_rows = len(df)
+        n_cols = len(df.columns)
+
+        # 自动检测列
+        from ml_quant import detect_columns, get_factor_columns
+        col_map = detect_columns(df)
+        factor_cols = get_factor_columns(df, col_map)
+
+        return jsonify({
+            "ok": True,
+            "n_rows": n_rows,
+            "n_cols": n_cols,
+            "columns": df.columns.tolist(),
+            "dtypes": {c: str(df[c].dtype) for c in df.columns},
+            "col_map": {k: v for k, v in col_map.items()},
+            "factor_cols": factor_cols,
+            "preview": make_json_safe(df.head(10).to_dict(orient="records")),
+            "date_range": {
+                "min": str(df[col_map["date"]].min()) if "date" in col_map else "N/A",
+                "max": str(df[col_map["date"]].max()) if "date" in col_map else "N/A",
+            } if "date" in col_map else None,
+            "n_stocks": int(df[col_map["code"]].nunique()) if "code" in col_map else 0,
+        })
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/ml/analyze", methods=["POST"])
+def ml_analyze():
+    """运行完整的 ML 量化分析流水线。
+
+    请求体：
+    {
+        "file": "stock_factor_panel_data.csv.csv",
+        "model_type": "random_forest",     // linear | decision_tree | random_forest | xgboost
+        "task_type": "regression",         // regression | classification
+        "top_n": 30,
+        "train_ratio": 0.6,
+        "val_ratio": 0.2,
+        "winsorize_pct": 0.01,
+        "standardize": true,
+        "model_kwargs": {}                 // 可选的模型参数覆盖
+    }
+    """
+    data = request.get_json()
+    filename = data.get("file", "")
+
+    if not filename:
+        return jsonify({"ok": False, "error": "请选择数据文件"}), 400
+
+    # 查找文件路径
+    filepath = None
+    for f_info in _list_ml_files():
+        if f_info["name"] == filename:
+            filepath = f_info["path"]
+            break
+
+    if filepath is None:
+        return jsonify({"ok": False, "error": f"文件不存在: {filename}"}), 404
+
+    # 验证模型类型
+    model_type = data.get("model_type", "random_forest")
+    if model_type not in MODEL_CHOICES:
+        return jsonify({"ok": False, "error": f"不支持的模型类型: {model_type}。可选: {MODEL_CHOICES}"}), 400
+
+    task_type = data.get("task_type", "regression")
+    if task_type not in TASK_CHOICES:
+        return jsonify({"ok": False, "error": f"不支持的任务类型: {task_type}。可选: {TASK_CHOICES}"}), 400
+
+    try:
+        config = MLQuantConfig(
+            data_path=filepath,
+            model_type=model_type,
+            task_type=task_type,
+            top_n=int(data.get("top_n", 30)),
+            train_ratio=float(data.get("train_ratio", 0.6)),
+            val_ratio=float(data.get("val_ratio", 0.2)),
+            test_ratio=float(data.get("test_ratio", 0.2)),
+            winsorize_pct=float(data.get("winsorize_pct", 0.01)),
+            standardize=data.get("standardize", True),
+            model_kwargs=data.get("model_kwargs", {}),
+            verbose=False,
+        )
+
+        result = run_ml_pipeline(config)
+        safe_result = make_json_safe(result)
+
+        return jsonify({
+            "ok": True,
+            **safe_result,
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/ml/compare", methods=["POST"])
+def ml_compare():
+    """运行多模型对比分析。
+
+    请求体：
+    {
+        "file": "stock_factor_panel_data.csv.csv",
+        "model_types": ["linear", "decision_tree", "random_forest"],
+        "task_type": "regression",
+        "top_n": 30
+    }
+    """
+    data = request.get_json()
+    filename = data.get("file", "")
+
+    if not filename:
+        return jsonify({"ok": False, "error": "请选择数据文件"}), 400
+
+    filepath = None
+    for f_info in _list_ml_files():
+        if f_info["name"] == filename:
+            filepath = f_info["path"]
+            break
+
+    if filepath is None:
+        return jsonify({"ok": False, "error": f"文件不存在: {filename}"}), 404
+
+    model_types = data.get("model_types", ["linear", "decision_tree", "random_forest"])
+    task_type = data.get("task_type", "regression")
+    top_n = int(data.get("top_n", 30))
+
+    try:
+        config = MLQuantConfig(
+            data_path=filepath,
+            task_type=task_type,
+            top_n=top_n,
+            verbose=False,
+        )
+        results = compare_models(config, model_types)
+        safe_results = make_json_safe(results)
+
+        return jsonify({
+            "ok": True,
+            "comparison": safe_results,
+            "model_types": model_types,
+            "task_type": task_type,
+            "top_n": top_n,
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # 启动
 # ═══════════════════════════════════════════════════════════════════════════
 

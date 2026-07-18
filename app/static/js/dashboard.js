@@ -186,6 +186,10 @@ function openPanel(name) {
   // Hide all result containers first
   elBacktestContainer.style.display = 'none';
   elTurtleContainer.style.display = 'none';
+  elMlContainer.style.display = 'none';
+  // Also hide any injected compare table
+  const compTable = $('#ml-compare-table-div');
+  if (compTable) compTable.innerHTML = '';
 
   // View switching
   if (activePanel === 'backtest') {
@@ -208,6 +212,20 @@ function openPanel(name) {
       elChartEmpty.querySelector('p').textContent = '设置参数 → 运行回测 → 查看结果';
     }
     if (turtleData) renderTurtle();
+  } else if (activePanel === 'ml') {
+    elChartContainer.style.display = 'none';
+    elChartEmpty.style.display = 'none';
+    if (mlData) {
+      elMlContainer.style.display = 'flex';
+      renderML();
+    } else if (mlCompareData) {
+      elMlContainer.style.display = 'flex';
+      renderMLCompare();
+    } else {
+      elChartEmpty.style.display = 'flex';
+      elChartEmpty.querySelector('h2').textContent = '🤖 ML 量化分析';
+      elChartEmpty.querySelector('p').textContent = '选择数据 → 配置模型 → 运行分析 → 查看结果';
+    }
   } else if (activePanel && indicatorData) {
     elChartEmpty.style.display = 'none';
     elChartContainer.style.display = 'block';
@@ -1094,16 +1112,537 @@ window.addEventListener('resize', () => {
       renderBacktest();
     } else if (activePanel === 'turtle' && turtleData) {
       renderTurtle();
+    } else if (activePanel === 'ml' && mlData) {
+      renderML();
+    } else if (activePanel === 'ml' && mlCompareData) {
+      renderMLCompare();
     } else if (indicatorData) {
       renderActiveChart();
     }
   }, 250);
 });
 
+// ═══════════════════════════ ML Quant ═══════════════════════
+
+let mlData = null;
+let mlCompareData = null;
+
+// DOM refs
+const elMlFile = $('#ml-file');
+const elMlModelType = $('#ml-model-type');
+const elMlTaskType = $('#ml-task-type');
+const elMlTopN = $('#ml-top-n');
+const elMlWinsorize = $('#ml-winsorize');
+const elMlTrainRatio = $('#ml-train-ratio');
+const elMlValRatio = $('#ml-val-ratio');
+const elMlStandardize = $('#ml-standardize');
+const elMlBtnAnalyze = $('#btn-ml-analyze');
+const elMlBtnCompare = $('#btn-ml-compare');
+const elMlStatus = $('#ml-status');
+const elMlContainer = $('#ml-container');
+
+function loadMLFiles() {
+  fetch('/api/ml/files')
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok) {
+        const files = data.files || [];
+        const opts = files.map(f =>
+          `<option value="${f.name}">${f.name} (${f.dir}) — ${f.n_cols||'?'}列</option>`
+        ).join('');
+        elMlFile.innerHTML = opts;
+        // 默认选 factor panel 数据
+        const factorOpt = Array.from(elMlFile.options).find(o => o.value.includes('factor'));
+        if (factorOpt) factorOpt.selected = true;
+      }
+    });
+}
+
+async function runMLAnalyze() {
+  const file = elMlFile.value;
+  if (!file) { elMlStatus.textContent = '❌ 请选择数据文件'; return; }
+
+  const params = {
+    file,
+    model_type: elMlModelType.value,
+    task_type: elMlTaskType.value,
+    top_n: parseInt(elMlTopN.value) || 30,
+    winsorize_pct: parseFloat(elMlWinsorize.value) / 100 || 0.01,
+    train_ratio: parseFloat(elMlTrainRatio.value) || 0.6,
+    val_ratio: parseFloat(elMlValRatio.value) || 0.2,
+    standardize: elMlStandardize.checked,
+  };
+
+  elMlBtnAnalyze.disabled = true;
+  elMlBtnCompare.disabled = true;
+  elMlStatus.textContent = '⏳ ML 分析运行中…（可能需要几十秒）';
+  mlCompareData = null;
+
+  try {
+    const resp = await fetch('/api/ml/analyze', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(params),
+    });
+    const r = await resp.json();
+    if (r.ok) {
+      mlData = r;
+      renderML();
+      elMlStatus.textContent = `✅ 分析完成 — ${r.data_summary?.n_stocks || '?'}只股票 × ${r.data_summary?.n_quarters || '?'}季度`;
+    } else {
+      elMlStatus.textContent = `❌ ${r.error}`;
+    }
+  } catch (e) {
+    elMlStatus.textContent = `❌ ${e.message}`;
+  } finally {
+    elMlBtnAnalyze.disabled = false;
+    elMlBtnCompare.disabled = false;
+  }
+}
+
+async function runMLCompare() {
+  const file = elMlFile.value;
+  if (!file) { elMlStatus.textContent = '❌ 请选择数据文件'; return; }
+
+  const params = {
+    file,
+    model_types: ['linear', 'decision_tree', 'random_forest'],
+    task_type: elMlTaskType.value,
+    top_n: parseInt(elMlTopN.value) || 30,
+  };
+
+  elMlBtnAnalyze.disabled = true;
+  elMlBtnCompare.disabled = true;
+  elMlStatus.textContent = '⏳ 多模型对比运行中…（可能需要几分钟）';
+  mlData = null;
+
+  try {
+    const resp = await fetch('/api/ml/compare', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(params),
+    });
+    const r = await resp.json();
+    if (r.ok) {
+      mlCompareData = r;
+      renderMLCompare();
+      elMlStatus.textContent = `✅ 对比完成 — ${r.model_types?.length || 0} 个模型`;
+    } else {
+      elMlStatus.textContent = `❌ ${r.error}`;
+    }
+  } catch (e) {
+    elMlStatus.textContent = `❌ ${e.message}`;
+  } finally {
+    elMlBtnAnalyze.disabled = false;
+    elMlBtnCompare.disabled = false;
+  }
+}
+
+function renderML() {
+  if (!mlData) return;
+  const m = mlData.backtest_metrics || {};
+  const mm = mlData.model_metrics || {};
+  const nc = mlData.nav_curve || {};
+  const qr = mlData.quarterly_results || [];
+  const ic = mlData.ic_series || [];
+  const fi = mlData.feature_importance || [];
+
+  // Show ML container
+  elChartEmpty.style.display = 'none';
+  elChartContainer.style.display = 'none';
+  elBacktestContainer.style.display = 'none';
+  elTurtleContainer.style.display = 'none';
+  elMlContainer.style.display = 'flex';
+  _hoverWired = false;
+
+  // ── KPI Cards ──────────────────────────────────────
+  renderMLKPIs(m, mm);
+
+  // ── Show model metrics row for regression/classification ──
+  const modelMetricsRow = $('#ml-model-metrics-row');
+  if (modelMetricsRow) {
+    const taskType = mlData.config?.task_type || 'regression';
+    if (taskType === 'regression') {
+      modelMetricsRow.style.display = 'flex';
+      const r2El = $('#ml-metric-r2');
+      const mseEl = $('#ml-metric-mse');
+      const maeEl = $('#ml-metric-mae');
+      if (r2El) r2El.querySelector('.bt-kpi-label').textContent = 'R²';
+      if (mseEl) mseEl.querySelector('.bt-kpi-label').textContent = 'MSE';
+      if (maeEl) maeEl.querySelector('.bt-kpi-label').textContent = 'MAE';
+    } else {
+      modelMetricsRow.style.display = 'flex';
+      const r2El = $('#ml-metric-r2');
+      const mseEl = $('#ml-metric-mse');
+      const maeEl = $('#ml-metric-mae');
+      if (r2El) r2El.querySelector('.bt-kpi-label').textContent = 'Accuracy';
+      if (mseEl) mseEl.querySelector('.bt-kpi-label').textContent = 'Precision';
+      if (maeEl) maeEl.querySelector('.bt-kpi-label').textContent = 'F1 Score';
+    }
+  }
+
+  // Fill model metrics
+  const setKey = 'test_';  // use test set metrics
+  fillMetricKPI('ml-metric-r2', mm[setKey + 'r2'] ?? mm[setKey + 'accuracy'],
+    mm[setKey + 'r2'] != null ? 'R²' : 'Accuracy',
+    (v) => (v >= 0 ? '+' : '') + (v * 100).toFixed(1) + '%');
+  fillMetricKPI('ml-metric-mse', mm[setKey + 'mse'] ?? mm[setKey + 'precision'],
+    mm[setKey + 'mse'] != null ? 'MSE' : 'Precision',
+    (v) => v.toFixed(4));
+  fillMetricKPI('ml-metric-mae', mm[setKey + 'mae'] ?? mm[setKey + 'f1'],
+    mm[setKey + 'mae'] != null ? 'MAE' : 'F1',
+    (v) => v.toFixed(4));
+
+  // ── Cumulative NAV Chart ───────────────────────────
+  renderMLNavChart(nc, qr);
+
+  // ── Quarterly Returns Chart ────────────────────────
+  renderMLQuarterlyChart(qr);
+
+  // ── Feature Importance Chart ───────────────────────
+  renderMLImportanceChart(fi);
+
+  // ── IC Series Chart ────────────────────────────────
+  renderMLICChart(ic);
+}
+
+function renderMLKPIs(m, mm) {
+  const ann = m.annual_return;
+  fillKPI('ml-kpi-annual',
+    ann != null ? ((ann >= 0 ? '+' : '') + ann.toFixed(2) + '%') : 'N/A',
+    '年化收益率',
+    `累计: ${m.cumulative_return != null ? (m.cumulative_return >= 0 ? '+' : '') + m.cumulative_return.toFixed(2) + '%' : 'N/A'}`,
+    ann > 0 ? 'positive' : (ann < 0 ? 'negative' : 'neutral'));
+
+  const sh = m.sharpe_ratio;
+  fillKPI('ml-kpi-sharpe',
+    sh != null ? sh.toFixed(3) : 'N/A', '夏普比率',
+    `基准年化: ${m.benchmark_annual_return != null ? (m.benchmark_annual_return >= 0 ? '+' : '') + m.benchmark_annual_return.toFixed(2) + '%' : 'N/A'}`,
+    sh >= 2 ? 'positive' : (sh >= 1 ? 'warning' : (sh < 0 ? 'negative' : 'neutral')));
+
+  const mdd = m.max_drawdown;
+  fillKPI('ml-kpi-drawdown',
+    mdd != null ? mdd.toFixed(2) + '%' : 'N/A', '最大回撤',
+    m.max_drawdown_quarter || '',
+    mdd > -10 ? 'positive' : (mdd > -20 ? 'warning' : 'negative'));
+
+  const wr = m.win_rate;
+  fillKPI('ml-kpi-winrate',
+    wr != null ? wr.toFixed(1) + '%' : 'N/A', '胜率',
+    `超额胜率: ${m.excess_win_rate != null ? m.excess_win_rate.toFixed(1) + '%' : 'N/A'}`,
+    wr >= 60 ? 'positive' : (wr >= 40 ? 'warning' : 'neutral'));
+
+  // IC card
+  const rankIC = mm.test_rank_ic_mean;
+  fillKPI('ml-kpi-ic',
+    rankIC != null ? rankIC.toFixed(4) : 'N/A', 'Rank IC (Mean)',
+    `ICIR: ${mm.test_icir != null ? mm.test_icir.toFixed(2) : 'N/A'}`,
+    rankIC > 0.05 ? 'positive' : (rankIC > 0 ? 'warning' : 'negative'));
+}
+
+function fillKPI(id, value, label, sub, cls) {
+  const el = $('#' + id);
+  if (!el) return;
+  el.className = 'bt-kpi-card ' + (cls || 'neutral');
+  el.innerHTML = `<span class="bt-kpi-value">${value}</span><span class="bt-kpi-label">${label}</span><span class="bt-kpi-sub">${sub}</span>`;
+}
+
+function fillMetricKPI(id, value, label, formatter) {
+  const el = $('#' + id);
+  if (!el) return;
+  if (value != null) {
+    const formatted = typeof formatter === 'function' ? formatter(value) : value;
+    el.querySelector('.bt-kpi-value').textContent = formatted;
+  }
+}
+
+function renderMLNavChart(nc, qr) {
+  const quarters = nc.quarters || qr.map(r => r.quarter) || [];
+  const pv = nc.portfolio_value || [];
+  const bv = nc.benchmark_value || [];
+  const initCap = mlData.backtest_metrics?.initial_capital || 1000000;
+
+  const traces = [
+    {
+      x: quarters, y: pv, type: 'scatter', mode: 'lines+markers',
+      line: { color: '#4f46e5', width: 2.0 },
+      marker: { size: 6, color: '#4f46e5' },
+      name: 'ML 策略', hovertemplate: '净值: ¥%{y:,.0f}<extra>ML 策略</extra>',
+    },
+    {
+      x: quarters, y: bv, type: 'scatter', mode: 'lines+markers',
+      line: { color: '#9ca3af', width: 1.2, dash: 'dash' },
+      marker: { size: 5, color: '#9ca3af' },
+      name: '等权基准', hovertemplate: '净值: ¥%{y:,.0f}<extra>等权基准</extra>',
+    },
+    {
+      x: [quarters[0], quarters[quarters.length - 1]],
+      y: [initCap, initCap], type: 'scatter', mode: 'lines',
+      line: { color: 'rgba(0,0,0,0.06)', width: 0.5 },
+      name: '初始资金', hoverinfo: 'skip', showlegend: false,
+    },
+  ];
+
+  const layout = {
+    ...chartLayout('组合净值 (CNY)'),
+    title: { text: '累计净值曲线 — ML 策略 vs 等权基准', font: { size: 13, color: '#374151' }, x: 0.01, y: 0.98 },
+    margin: { l: 70, r: 24, t: 36, b: 50 },
+    yaxis: { ...chartLayout().yaxis, title: { text: '净值 (CNY)', font: { size: 10, color: '#6b7280' }, standoff: 8 }},
+  };
+
+  Plotly.react('ml-chart-nav', traces, layout, PLOTLY_CONFIG);
+}
+
+function renderMLQuarterlyChart(qr) {
+  const quarters = qr.map(r => r.quarter);
+  const stratRets = qr.map(r => (r.strategy_return != null ? r.strategy_return * 100 : null));
+  const benchRets = qr.map(r => (r.benchmark_return != null ? r.benchmark_return * 100 : null));
+  // Excess returns as bar colors
+  const excessColors = qr.map(r => {
+    if (r.strategy_return == null || r.benchmark_return == null) return 'rgba(0,0,0,0.1)';
+    return (r.strategy_return > r.benchmark_return) ? 'rgba(16,185,129,0.7)' : 'rgba(239,68,68,0.5)';
+  });
+
+  const traces = [
+    {
+      x: quarters, y: benchRets, type: 'bar', name: '基准收益',
+      marker: { color: 'rgba(156,163,175,0.5)' },
+      hovertemplate: '基准: %{y:.2f}%<extra></extra>',
+    },
+    {
+      x: quarters, y: stratRets, type: 'bar', name: '策略收益',
+      marker: { color: excessColors },
+      hovertemplate: '策略: %{y:.2f}%<extra></extra>',
+    },
+  ];
+
+  const layout = {
+    ...chartLayout('收益率 (%)'),
+    barmode: 'overlay',
+    title: { text: '每季度收益率', font: { size: 12, color: '#374151' }, x: 0.01, y: 0.98 },
+    margin: { l: 55, r: 18, t: 36, b: 50 },
+    yaxis: { ...chartLayout().yaxis, title: { text: '收益率 (%)', font: { size: 10, color: '#6b7280' }, standoff: 6 }},
+    xaxis: { ...chartLayout().xaxis, tickangle: -45 },
+  };
+
+  Plotly.react('ml-chart-quarterly', traces, layout, PLOTLY_CONFIG);
+}
+
+function renderMLImportanceChart(fi) {
+  if (!fi || fi.length === 0) {
+    Plotly.react('ml-chart-importance', [], chartLayout(), PLOTLY_CONFIG);
+    return;
+  }
+  const topFi = fi.slice(0, 15).reverse();
+  const traces = [{
+    y: topFi.map(f => f.feature),
+    x: topFi.map(f => f.importance),
+    type: 'bar', orientation: 'h',
+    marker: {
+      color: topFi.map((_, i) => {
+        const t = i / (topFi.length - 1 || 1);
+        return `rgba(79,70,229,${0.3 + t * 0.7})`;
+      }),
+    },
+    hovertemplate: '%{x:.4f}<extra>%{y}</extra>',
+  }];
+
+  const layout = {
+    ...chartLayout(''),
+    title: { text: '特征重要性 (Top 15)', font: { size: 12, color: '#374151' }, x: 0.01, y: 0.98 },
+    margin: { l: 180, r: 18, t: 36, b: 40 },
+    xaxis: { ...chartLayout().xaxis, title: { text: 'Importance', font: { size: 10, color: '#6b7280' } }},
+  };
+
+  Plotly.react('ml-chart-importance', traces, layout, PLOTLY_CONFIG);
+}
+
+function renderMLICChart(ic) {
+  if (!ic || ic.length === 0) {
+    Plotly.react('ml-chart-ic', [], chartLayout(), PLOTLY_CONFIG);
+    return;
+  }
+  const quarters = ic.map(d => d.quarter);
+  const icVals = ic.map(d => d.ic);
+  const rankIcVals = ic.map(d => d.rank_ic);
+
+  const traces = [
+    {
+      x: quarters, y: icVals, type: 'scatter', mode: 'lines+markers',
+      line: { color: '#3b82f6', width: 1.4 },
+      marker: { size: 7, color: '#3b82f6' },
+      name: 'IC', hovertemplate: 'IC: %{y:.4f}<extra></extra>',
+    },
+    {
+      x: quarters, y: rankIcVals, type: 'scatter', mode: 'lines+markers',
+      line: { color: '#f59e0b', width: 1.4 },
+      marker: { size: 7, color: '#f59e0b' },
+      name: 'Rank IC', hovertemplate: 'Rank IC: %{y:.4f}<extra></extra>',
+    },
+    {
+      x: [quarters[0], quarters[quarters.length - 1]], y: [0, 0],
+      type: 'scatter', mode: 'lines',
+      line: { color: 'rgba(0,0,0,0.08)', width: 0.5 },
+      name: 'Zero', hoverinfo: 'skip', showlegend: false,
+    },
+  ];
+
+  const layout = {
+    ...chartLayout('IC'),
+    title: { text: 'IC / Rank IC 逐季表现', font: { size: 12, color: '#374151' }, x: 0.01, y: 0.98 },
+    margin: { l: 55, r: 18, t: 36, b: 50 },
+    yaxis: { ...chartLayout().yaxis, title: { text: 'IC', font: { size: 10, color: '#6b7280' }, standoff: 6 }},
+    xaxis: { ...chartLayout().xaxis, tickangle: -45 },
+  };
+
+  Plotly.react('ml-chart-ic', traces, layout, PLOTLY_CONFIG);
+}
+
+function renderMLCompare() {
+  if (!mlCompareData) return;
+
+  elChartEmpty.style.display = 'none';
+  elChartContainer.style.display = 'none';
+  elBacktestContainer.style.display = 'none';
+  elTurtleContainer.style.display = 'none';
+  elMlContainer.style.display = 'none';
+
+  // Use a simple approach: show compare results in the ML container with a table
+  elMlContainer.style.display = 'flex';
+  _hoverWired = false;
+
+  const comp = mlCompareData.comparison || {};
+  const models = Object.keys(comp);
+
+  // Build comparison KPI table at top
+  let tableHTML = `
+    <div class="ml-section-heading">📊 模型对比结果</div>
+    <div style="overflow-x:auto;background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);">
+    <table class="ml-compare-table">
+      <thead><tr>
+        <th>指标</th>
+        ${models.map(m => `<th>${m.replace(/_/g,' ')}</th>`).join('')}
+      </tr></thead>
+      <tbody>`;
+
+  const metricRows = [
+    ['累计收益率 (%)', 'cumulative_return'],
+    ['年化收益率 (%)', 'annual_return'],
+    ['夏普比率', 'sharpe_ratio'],
+    ['最大回撤 (%)', 'max_drawdown'],
+    ['胜率 (%)', 'win_rate'],
+    ['超额胜率 (%)', 'excess_win_rate'],
+  ];
+
+  for (const [label, key] of metricRows) {
+    const vals = models.map(m => {
+      const bm = comp[m]?.backtest_metrics || {};
+      return bm[key];
+    });
+    const maxVal = Math.max(...vals.filter(v => v != null));
+    const minVal = Math.min(...vals.filter(v => v != null));
+    tableHTML += `<tr><td style="font-weight:600;">${label}</td>`;
+    for (let i = 0; i < models.length; i++) {
+      const v = vals[i];
+      const isMax = v != null && v === maxVal && maxVal !== minVal;
+      const isMin = v != null && v === minVal && maxVal !== minVal;
+      let cls = '';
+      if (isMax && (key.includes('return') || key.includes('sharpe') || key.includes('win'))) cls = 'positive highlight';
+      else if (isMin && (key.includes('return') || key.includes('sharpe') || key.includes('win'))) cls = 'negative';
+      else if (isMax && key.includes('drawdown')) cls = 'positive highlight';
+      else if (isMin && key.includes('drawdown')) cls = 'negative';
+      tableHTML += `<td class="${cls}">${v != null ? (typeof v === 'number' ? v.toFixed(2) : v) : 'N/A'}</td>`;
+    }
+    tableHTML += '</tr>';
+  }
+
+  // Add model metrics rows
+  const modelMetricRows = [
+    ['Rank IC Mean', 'rank_ic_mean', 'test_'],
+    ['ICIR', 'icir', 'test_'],
+  ];
+  for (const [label, key, prefix] of modelMetricRows) {
+    const vals = models.map(m => {
+      const mm = comp[m]?.model_metrics || {};
+      return mm[prefix + key];
+    });
+    const maxVal = Math.max(...vals.filter(v => v != null));
+    const minVal = Math.min(...vals.filter(v => v != null));
+    tableHTML += `<tr><td style="font-weight:600;">${label}</td>`;
+    for (let i = 0; i < models.length; i++) {
+      const v = vals[i];
+      const isMax = v != null && v === maxVal && maxVal !== minVal;
+      let cls = isMax ? 'positive highlight' : '';
+      tableHTML += `<td class="${cls}">${v != null ? v.toFixed(4) : 'N/A'}</td>`;
+    }
+    tableHTML += '</tr>';
+  }
+
+  tableHTML += '</tbody></table></div>';
+
+  // Render the table in a new div we create
+  let tableDiv = $('#ml-compare-table-div');
+  if (!tableDiv) {
+    tableDiv = document.createElement('div');
+    tableDiv.id = 'ml-compare-table-div';
+    elMlContainer.insertBefore(tableDiv, elMlContainer.firstChild);
+  }
+  tableDiv.innerHTML = tableHTML;
+
+  // ── Compare NAV Chart ──────────────────────────────
+  const navTraces = [];
+  const colors = ['#4f46e5', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6'];
+  models.forEach((m, i) => {
+    const nc = comp[m]?.nav_curve || {};
+    const qrComp = comp[m]?.quarterly_results || [];
+    const quarters = nc.quarters || qrComp.map(r => r.quarter) || [];
+    const pv = nc.portfolio_value || [];
+    if (pv.length > 0) {
+      navTraces.push({
+        x: quarters, y: pv, type: 'scatter', mode: 'lines+markers',
+        line: { color: colors[i % colors.length], width: 1.8 },
+        marker: { size: 5 },
+        name: m.replace(/_/g, ' '), hovertemplate: '%{x}<br>¥%{y:,.0f}<extra>' + m + '</extra>',
+      });
+    }
+  });
+
+  const navLayout = {
+    ...chartLayout('组合净值 (CNY)'),
+    title: { text: '累计净值曲线 — 多模型对比', font: { size: 13, color: '#374151' }, x: 0.01, y: 0.98 },
+    margin: { l: 70, r: 24, t: 36, b: 50 },
+    yaxis: { ...chartLayout().yaxis, title: { text: '净值 (CNY)', font: { size: 10, color: '#6b7280' }, standoff: 8 }},
+  };
+  Plotly.react('ml-chart-nav', navTraces, navLayout, PLOTLY_CONFIG);
+
+  // Hide other ML charts
+  Plotly.react('ml-chart-quarterly', [], chartLayout(), PLOTLY_CONFIG);
+  Plotly.react('ml-chart-importance', [], chartLayout(), PLOTLY_CONFIG);
+  Plotly.react('ml-chart-ic', [], chartLayout(), PLOTLY_CONFIG);
+
+  // Update KPIs with best model
+  const bestModel = models.reduce((best, m) => {
+    const bm = comp[m]?.backtest_metrics || {};
+    const bestBm = comp[best]?.backtest_metrics || {};
+    return (bm.annual_return || -Infinity) > (bestBm.annual_return || -Infinity) ? m : best;
+  }, models[0]);
+  const bestM = comp[bestModel]?.backtest_metrics || {};
+  const bestMM = comp[bestModel]?.model_metrics || {};
+  renderMLKPIs(bestM, bestMM);
+  elMlStatus.textContent = `✅ 对比完成 | 最佳: ${bestModel.replace(/_/g, ' ')} (年化 ${(bestM.annual_return||0).toFixed(2)}%)`;
+}
+
+
+// ═══════════════════════════ Events: ML ═══════════════
+
+elMlBtnAnalyze.addEventListener('click', runMLAnalyze);
+elMlBtnCompare.addEventListener('click', runMLCompare);
+elMlFile.addEventListener('change', () => { mlData = null; mlCompareData = null; });
+
+
 // ═══════════════════════════ Init ════════════════════════
 
 (async function init() {
   await loadFiles();
+  loadMLFiles();
   selectIndicator('price_ma');
   openPanel('data');
   if (elFile.value) await computeAndRender();
